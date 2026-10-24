@@ -1,0 +1,616 @@
+/* 全知之眼 · Panopticon — 样式 */
+
+@property --i1 { syntax: '<color>'; inherits: true; initial-value: #ffd36b; }
+@property --i2 { syntax: '<color>'; inherits: true; initial-value: #7a2a05; }
+@property --veins { syntax: '<number>'; inherits: true; initial-value: 0.2; }
+@property --glow { syntax: '<number>'; inherits: true; initial-value: 0.2; }
+
+:root {
+  --bg: #07030a;
+  --ink: #eadfc8;
+  --ink-dim: #a99a86;
+  --gold: #c9a45c;
+  --gold-hi: #f1d79a;
+  --blood: #9b111e;
+  --blood-hi: #ff3b30;
+  --panel: rgba(10, 4, 10, 0.78);
+  --beat: 2.4s;
+  --serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --display: 'Cinzel', 'Noto Serif SC', serif;
+  --rune: 'Noto Sans Runic', 'Segoe UI Historic', serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, #1c0612 0%, #0c030b 55%, #040106 100%);
+}
+
+/* ---------- 背景层 ---------- */
+
+#dust {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#sigil {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: 150vmax; height: 150vmax;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.16;
+}
+#sigil .spin-a { animation: spin 240s linear infinite; transform-origin: 0 0; }
+#sigil .spin-b { animation: spin 180s linear infinite reverse; transform-origin: 0 0; }
+#sigil text { font-family: var(--rune); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#bigYear {
+  position: fixed;
+  left: 2.5vw; bottom: -2vh;
+  z-index: 1;
+  font-family: var(--display);
+  font-size: clamp(90px, 18vw, 260px);
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(201, 164, 92, 0.18);
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ---------- 全知之眼 ---------- */
+
+#eyeWrap {
+  --i1: #ffd36b;
+  --i2: #7a2a05;
+  --veins: 0.2;
+  --glow: 0.2;
+  position: fixed;
+  left: 0; top: 0;
+  width: var(--eye-size, 300px);
+  height: var(--eye-size, 300px);
+  z-index: 2;
+  pointer-events: none;
+  transition:
+    transform 2.4s cubic-bezier(.65, 0, .25, 1),
+    --i1 2.2s ease, --i2 2.2s ease, --veins 2.2s ease, --glow 2.2s ease;
+  will-change: transform;
+  filter:
+    drop-shadow(0 0 calc(10px + 50px * var(--glow)) rgba(255, 40, 30, calc(0.15 + 0.5 * var(--glow))));
+}
+#eyeInner { width: 100%; height: 100%; }
+#eye { width: 100%; height: 100%; overflow: visible; }
+#eye .rays { animation: spin 90s linear infinite; transform-origin: 0 0; }
+#eye .tri-runes text { font-family: var(--rune); }
+#eVeins { opacity: var(--veins); }
+#eTear { stroke-dasharray: 260; stroke-dashoffset: 260; transition: stroke-dashoffset 4s ease-in; }
+body.staring #eTear { stroke-dashoffset: 0; }
+
+#watchers {
+  position: fixed; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.watcher {
+  position: absolute;
+  width: 70px; height: 40px;
+  margin: -20px 0 0 -35px;
+  opacity: 0;
+  animation: watcher 4.2s ease-in-out forwards;
+}
+.watcher svg { width: 100%; height: 100%; overflow: visible; }
+.watcher .lid { transform-origin: 0 0; animation: watcherLid 4.2s ease-in-out forwards; }
+@keyframes watcher {
+  0% { opacity: 0; } 12% { opacity: .85; } 85% { opacity: .85; } 100% { opacity: 0; }
+}
+@keyframes watcherLid {
+  0% { transform: scaleY(0.02); } 15% { transform: scaleY(1); } 48% { transform: scaleY(1); }
+  52% { transform: scaleY(0.05); } 56% { transform: scaleY(1); } 85% { transform: scaleY(1); }
+  100% { transform: scaleY(0.02); }
+}
+
+/* ---------- 主舞台 ---------- */
+
+main {
+  position: fixed; inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: clamp(140px, 26vh, 240px);
+  gap: 14px;
+  pointer-events: none;
+}
+
+.frame {
+  position: relative;
+  width: min(78vw, 1000px, calc((100vh - 380px) * 1.6));
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, #2a1a10, #120a08 40%, #2a1a10 60%, #0e0806);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px #6b5130,
+    0 0 0 5px #120a06,
+    0 0 0 6px #8a6a3a,
+    0 30px 90px rgba(0, 0, 0, 0.85),
+    0 0 120px rgba(150, 20, 30, 0.25);
+  transition: opacity 3s ease, background 3s ease, box-shadow 3s ease;
+}
+.frame::before {
+  content: '';
+  position: absolute; inset: 6px;
+  border: 1px solid rgba(201, 164, 92, 0.55);
+  pointer-events: none;
+  z-index: 3;
+}
+.frame .corner {
+  position: absolute;
+  width: 74px; height: 74px;
+  z-index: 4;
+  pointer-events: none;
+}
+.frame .corner.tl { left: -18px; top: -18px; }
+.frame .corner.tr { right: -18px; top: -18px; transform: scaleX(-1); }
+.frame .corner.bl { left: -18px; bottom: -18px; transform: scaleY(-1); }
+.frame .corner.br { right: -18px; bottom: -18px; transform: scale(-1, -1); }
+.frame .medal {
+  position: absolute;
+  left: 50%; top: -30px;
+  width: 64px; height: 56px;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+}
+.frame .medal .m-iris { transition: transform .4s ease; }
+.frame .plate {
+  position: absolute;
+  left: 50%; bottom: -15px;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 3px 18px;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .35em;
+  color: var(--gold-hi);
+  background: linear-gradient(#2c1d10, #120a06);
+  border: 1px solid #8a6a3a;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: #000;
+  transition: opacity 3s ease;
+}
+.scene {
+  position: absolute; inset: 0;
+  will-change: transform;
+}
+.scene > svg { width: 100%; height: 100%; display: block; }
+
+.scene.in-next  { animation: inNext 1.25s cubic-bezier(.75, 0, .2, 1) both; }
+.scene.out-next { animation: outNext 1.25s cubic-bezier(.75, 0, .2, 1) both; }
+.scene.in-prev  { animation: inPrev 1.25s cubic-bezier(.75, 0, .2, 1) both; }
+.scene.out-prev { animation: outPrev 1.25s cubic-bezier(.75, 0, .2, 1) both; }
+@keyframes inNext  { from { transform: translateX(104%); } to { transform: none; } }
+@keyframes outNext { from { transform: none; filter: none; } to { transform: translateX(-38%); filter: brightness(.15) saturate(.3); } }
+@keyframes inPrev  { from { transform: translateX(-104%); } to { transform: none; } }
+@keyframes outPrev { from { transform: none; filter: none; } to { transform: translateX(38%); filter: brightness(.15) saturate(.3); } }
+
+/* 场景中通用的动画 */
+.scene .tw { animation: twinkle 3s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .12; } }
+.scene .fx, .scene [class*="anim-"] { transform-box: fill-box; transform-origin: center; }
+.scene .rain { animation: rain .7s linear infinite; }
+@keyframes rain { to { transform: translate(-30px, 1000px); } }
+.scene .flutter { animation: flutter 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: top center; }
+@keyframes flutter { 50% { transform: skewX(-7deg) scaleY(.96); } }
+.scene .drift { animation: drift 40s linear infinite alternate; }
+@keyframes drift { to { transform: translateX(-80px); } }
+.scene .float { animation: floaty 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes floaty { 50% { transform: translateY(-14px); } }
+.scene .flicker { animation: flicker .12s steps(2) infinite; transform-box: fill-box; transform-origin: top center; }
+@keyframes flicker { 50% { transform: scale(.92, 1.08); opacity: .9; } }
+.scene .pulse { animation: pulse 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { 50% { opacity: .45; transform: scale(1.04); } }
+.scene .blinkred { animation: blinkred 1.4s steps(1) infinite; }
+@keyframes blinkred { 50% { opacity: .1; } }
+.scene .ecg { stroke-dasharray: 420; animation: ecg 2.4s linear infinite; }
+@keyframes ecg { from { stroke-dashoffset: 840; } to { stroke-dashoffset: 0; } }
+.scene .sec-hand { animation: spin 60s steps(60) infinite; transform-box: view-box; }
+.scene .shoot { animation: shoot 7s ease-in infinite; opacity: 0; }
+@keyframes shoot {
+  0%, 70% { opacity: 0; transform: translate(0, 0); }
+  72% { opacity: 1; }
+  86% { opacity: 0; transform: translate(-520px, 230px); }
+  100% { opacity: 0; transform: translate(-520px, 230px); }
+}
+.scene .firefly { animation: firefly 5s ease-in-out infinite; }
+@keyframes firefly { 0%, 100% { opacity: .1; transform: translate(0, 0); } 50% { opacity: 1; transform: translate(10px, -16px); } }
+.scene .sweep { animation: sweep 9s ease-in-out infinite alternate; transform-box: view-box; }
+@keyframes sweep { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
+.scene .ghost { animation: ghost 6s ease-in infinite; }
+@keyframes ghost { 0% { opacity: .22; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-60px); } }
+.scene .rise { animation: rise 14s ease-in-out infinite alternate; }
+@keyframes rise { to { transform: translateY(-50px); } }
+.scene .bubble { animation: bubble 6s linear infinite; }
+@keyframes bubble { from { transform: translateY(0); opacity: 0; } 10% { opacity: .8; } to { transform: translateY(-640px); opacity: 0; } }
+.scene .streak { stroke-dasharray: 60 600; animation: streak 1.6s linear infinite; }
+@keyframes streak { from { stroke-dashoffset: 660; } to { stroke-dashoffset: 0; } }
+.scene .reticle { animation: reticle 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes reticle { 50% { transform: scale(1.06); opacity: .6; } }
+.scene .shimmer { animation: shimmer 4s ease-in-out infinite; }
+@keyframes shimmer { 50% { opacity: .55; } }
+.scene .bar-anim { animation: bars .9s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: bottom; }
+@keyframes bars { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+
+/* 场景内由剧情触发的状态 */
+.scene .on-show { opacity: 0; transition: opacity 2.5s ease, transform 2.5s cubic-bezier(.2, .8, .2, 1); }
+.scene.on .on-show { opacity: 1; }
+.scene .sky-eye { transform-box: fill-box; transform-origin: center; transform: scaleY(.02); }
+.scene.on .sky-eye { transform: scaleY(1); }
+.scene .cosmos-iris { transform-box: fill-box; transform-origin: center; transform: scale(0); }
+.scene.on .cosmos-iris { transform: scale(1); }
+.scene .msg { opacity: 0; transition: opacity 1.5s ease; }
+.scene.msg .msg { opacity: 1; }
+.scene .anime-eye { transform-box: fill-box; transform-origin: center; transform: scaleY(.03); transition: transform 3.2s cubic-bezier(.3, 0, .2, 1); }
+.scene.on .anime-eye { transform: scaleY(1); }
+.scene .reflect { opacity: 0; transition: opacity 3s ease 1s; }
+.scene.reflect .reflect { opacity: 1; }
+
+/* ---------- 幕间标题卡 ---------- */
+
+.titlecard {
+  position: absolute;
+  left: -10%; right: -10%;
+  top: 34%;
+  height: 32%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  background: linear-gradient(90deg, transparent, rgba(8, 2, 6, .92) 12%, rgba(8, 2, 6, .92) 88%, transparent);
+  border-top: 1px solid rgba(201, 164, 92, .6);
+  border-bottom: 1px solid rgba(201, 164, 92, .6);
+  transform: translateX(110%) skewX(-14deg);
+  pointer-events: none;
+}
+.titlecard.go { animation: card 2.6s cubic-bezier(.7, 0, .3, 1) both; }
+@keyframes card {
+  0% { transform: translateX(110%) skewX(-14deg); }
+  28% { transform: translateX(0) skewX(-14deg); }
+  72% { transform: translateX(0) skewX(-14deg); }
+  100% { transform: translateX(-110%) skewX(-14deg); }
+}
+.titlecard > * { transform: skewX(14deg); }
+.titlecard .num {
+  font-family: var(--serif);
+  font-weight: 900;
+  font-size: clamp(30px, 5vw, 64px);
+  color: var(--blood-hi);
+  text-shadow: 0 0 24px rgba(255, 30, 30, .5);
+  letter-spacing: .1em;
+}
+.titlecard .name {
+  font-size: clamp(22px, 3.4vw, 44px);
+  letter-spacing: .5em;
+  color: var(--ink);
+}
+.titlecard .yr {
+  font-family: var(--display);
+  font-size: clamp(12px, 1.4vw, 18px);
+  color: var(--gold);
+  letter-spacing: .3em;
+}
+
+/* ---------- 画框 HUD ---------- */
+
+.hud {
+  position: absolute;
+  top: 12px; left: 16px; right: 16px;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  pointer-events: none;
+  font-size: 13px;
+  letter-spacing: .25em;
+  color: rgba(234, 223, 200, .85);
+  text-shadow: 0 1px 4px #000, 0 0 10px #000;
+}
+.hud > span {
+  padding: 3px 10px;
+  background: rgba(6, 2, 6, .55);
+  border-radius: 2px;
+}
+.hud .act-label b { color: var(--blood-hi); font-weight: 700; margin-right: .5em; }
+.hud .yr { font-family: var(--display); font-size: 16px; color: var(--gold-hi); }
+
+/* ---------- 对白框（日式视觉小说风） ---------- */
+
+.dialog {
+  position: absolute;
+  left: 14px; right: 14px; bottom: 14px;
+  z-index: 4;
+  min-height: 25%;
+  padding: 26px 6% 18px;
+  background: linear-gradient(180deg, transparent 0%, rgba(6, 2, 6, .72) 22%, rgba(6, 2, 6, .9) 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+.dialog.show { opacity: 1; }
+.dialog .who {
+  position: absolute;
+  top: 0; left: 5%;
+  padding: 3px 20px 3px 16px;
+  font-size: 14px;
+  letter-spacing: .3em;
+  color: #120608;
+  background: linear-gradient(90deg, var(--gold-hi), var(--gold));
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.dialog .who:empty { display: none; }
+.dialog .who.it {
+  color: #ffd9d6;
+  background: linear-gradient(90deg, #6a0710, #2a0206);
+  text-shadow: 0 0 8px #ff2a2a;
+}
+.dialog .text {
+  font-size: clamp(14px, 1.55vw, 19px);
+  line-height: 1.85;
+  letter-spacing: .06em;
+  min-height: 3.7em;
+  text-shadow: 0 1px 3px #000;
+}
+.dialog .text.narr { color: #e2d6bd; }
+.dialog .text.it { color: #ff6a5e; font-weight: 700; letter-spacing: .18em; text-shadow: 0 0 12px rgba(255, 30, 30, .7); }
+.dialog .text.it span { display: inline-block; animation: jitter .18s steps(2) infinite; }
+@keyframes jitter {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(.6px, -.8px); }
+  100% { transform: translate(-.7px, .5px); }
+}
+.dialog .more {
+  position: absolute;
+  right: 4%; bottom: 10px;
+  color: var(--gold);
+  font-size: 12px;
+  animation: more 1s ease-in-out infinite;
+  opacity: 0;
+}
+.dialog.done .more { opacity: 1; }
+@keyframes more { 50% { transform: translateY(4px); } }
+
+/* ---------- 控制条 ---------- */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  font-size: 13px;
+  color: var(--ink-dim);
+  max-width: 96vw;
+}
+.controls button {
+  font: inherit;
+  color: var(--ink);
+  background: rgba(20, 8, 12, .7);
+  border: 1px solid rgba(201, 164, 92, .45);
+  padding: 6px 12px;
+  letter-spacing: .15em;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s;
+  white-space: nowrap;
+}
+.controls button:hover { border-color: var(--gold-hi); background: rgba(60, 14, 20, .8); }
+.controls button[aria-pressed="true"] { color: #120608; background: var(--gold); border-color: var(--gold-hi); }
+.controls button:focus-visible, .gate button:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+  padding: 0 4px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px; right: 10px; top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 164, 92, .6), transparent);
+}
+.timeline button {
+  position: relative;
+  width: 32px; height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: rgba(201, 164, 92, .3);
+  font-size: 12px;
+  letter-spacing: 0;
+  margin: 0 3px;
+  color: var(--ink-dim);
+}
+.timeline button.cur {
+  color: #fff;
+  border-color: var(--blood-hi);
+  background: radial-gradient(circle, #7a0a14, #20040a);
+  box-shadow: 0 0 14px rgba(255, 40, 40, .6);
+}
+.timeline button.seen { color: var(--gold-hi); }
+
+.hint {
+  position: fixed;
+  right: 2vw; bottom: 1.6vh;
+  z-index: 6;
+  font-size: 11px;
+  letter-spacing: .2em;
+  color: rgba(169, 154, 134, .55);
+  pointer-events: none;
+}
+
+/* ---------- 氛围层 ---------- */
+
+.vignette {
+  position: fixed; inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(40, 0, 6, .55) 80%, rgba(0, 0, 0, .9) 100%);
+  animation: beat var(--beat) ease-in-out infinite;
+}
+@keyframes beat {
+  0%, 100% { opacity: .75; }
+  8% { opacity: 1; }
+  16% { opacity: .8; }
+  24% { opacity: .97; }
+}
+.grain {
+  position: fixed; inset: -50%;
+  z-index: 9;
+  pointer-events: none;
+  opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain .5s steps(4) infinite;
+}
+@keyframes grain {
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-1%, -2%); }
+}
+.redflash {
+  position: fixed; inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--fx, 50%) var(--fy, 20%), rgba(255, 20, 20, .35), transparent 60%);
+  opacity: 0;
+}
+.redflash.go { animation: redflash 1.4s ease-out; }
+@keyframes redflash { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 0; } }
+
+body.shake main, body.shake #eyeWrap #eyeInner { animation: shake .6s cubic-bezier(.36, .07, .19, .97); }
+@keyframes shake {
+  10%, 90% { transform: translate(-2px, 1px); }
+  20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-6px, 3px); }
+  40%, 60% { transform: translate(6px, -3px); }
+}
+
+/* 终幕：故事退去，只剩下眼睛 */
+body.staring .stage { opacity: .12; }
+body.staring .frame { background: transparent; box-shadow: 0 0 0 1px rgba(107, 81, 48, .3); }
+body.staring .hud, body.staring .frame .corner, body.staring .frame .medal, body.staring .frame .plate { opacity: .2; transition: opacity 3s; }
+body.staring .dialog { background: linear-gradient(180deg, transparent, rgba(6, 2, 6, .85) 30%); }
+
+/* ---------- 开场 / 终场 ---------- */
+
+.gate {
+  position: fixed; inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  text-align: center;
+  padding: 24px 16px;
+  background: radial-gradient(ellipse at center, rgba(20, 2, 8, .86), rgba(2, 0, 2, .97) 70%);
+  transition: opacity 1.8s ease;
+}
+.gate.hide { opacity: 0; pointer-events: none; }
+.gate h1 {
+  margin: 0;
+  font-size: clamp(38px, 7vw, 84px);
+  font-weight: 900;
+  letter-spacing: .4em;
+  padding-left: .4em;
+  color: var(--ink);
+  text-shadow: 0 0 30px rgba(255, 30, 30, .45);
+}
+.gate .en {
+  font-family: var(--display);
+  letter-spacing: .6em;
+  font-size: clamp(11px, 1.3vw, 14px);
+  color: var(--gold);
+}
+.gate p {
+  max-width: 34em;
+  margin: 0;
+  line-height: 2;
+  color: var(--ink-dim);
+  font-size: clamp(13px, 1.4vw, 16px);
+  letter-spacing: .1em;
+}
+.gate button {
+  margin-top: 12px;
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: .6em;
+  padding: 12px 30px 12px 38px;
+  color: #ffd9d6;
+  background: linear-gradient(#4a0610, #1a0206);
+  border: 1px solid var(--blood-hi);
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(255, 30, 30, .35);
+  animation: gatepulse 2.4s ease-in-out infinite;
+}
+.gate small { color: rgba(169, 154, 134, .55); letter-spacing: .2em; font-size: 11px; }
+@keyframes gatepulse { 50% { box-shadow: 0 0 60px rgba(255, 30, 30, .65); } }
+
+/* ---------- 窄屏 ---------- */
+
+@media (max-width: 760px) {
+  main { padding-top: 16vh; justify-content: flex-start; }
+  .frame { width: 94vw; padding: 9px; }
+  .stage { aspect-ratio: 1 / 1; }
+  .dialog {
+    position: relative;
+    left: 0; right: 0; bottom: 0;
+    margin-top: 0;
+    min-height: 8.5em;
+    padding: 22px 16px 14px;
+    background: rgba(6, 2, 6, .95);
+  }
+  .hud { font-size: 11px; top: 8px; left: 10px; right: 10px; }
+  .controls { flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .controls .label { display: none; }
+  .timeline button { width: 26px; height: 26px; margin: 0 1px; font-size: 11px; }
+  .hint { display: none; }
+  .frame .corner { width: 48px; height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene.in-next, .scene.in-prev { animation: fadeIn 1s both; }
+  .scene.out-next, .scene.out-prev { animation: fadeOut 1s both; }
+  .grain, .vignette, body.shake main { animation: none; }
+  @keyframes fadeIn { from { opacity: 0; } }
+  @keyframes fadeOut { to { opacity: 0; } }
+}

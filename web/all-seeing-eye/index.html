@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>全知之眼 · 彼岸</title>
+  <meta name="description" content="在全知之眼的注视下，一个孩子从降生、好奇、攀登，到飞向 4.24 光年外的比邻星 b。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Sans+Runic&family=Noto+Serif+SC:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="dust" aria-hidden="true"></canvas>
+  <div id="sigil" aria-hidden="true"></div>
+  <div id="bigYear" aria-hidden="true">∞</div>
+
+  <!-- 全知之眼 -->
+  <div id="eyeWrap" aria-hidden="true">
+    <div id="eyeInner"><svg id="eye" viewBox="-260 -260 520 520"></svg></div>
+  </div>
+  <div id="watchers" aria-hidden="true"></div>
+
+  <main>
+    <div class="frame" role="region" aria-label="故事画框，点击推进">
+      <svg class="corner tl" viewBox="0 0 74 74" aria-hidden="true">
+        <path d="M4 70 L4 4 L70 4" fill="none" stroke="#c9a45c" stroke-width="3"/>
+        <path d="M12 70 L12 12 L70 12" fill="none" stroke="#8a6a3a" stroke-width="1.5"/>
+        <path d="M4 4 L26 26" stroke="#c9a45c" stroke-width="2"/>
+        <circle cx="26" cy="26" r="7" fill="#120a06" stroke="#f1d79a" stroke-width="2"/>
+        <circle cx="26" cy="26" r="2.5" fill="#ff3b30"/>
+        <path d="M40 4 Q 46 16 58 12 M 4 40 Q 16 46 12 58" fill="none" stroke="#c9a45c" stroke-width="1.5"/>
+      </svg>
+      <svg class="corner tr" viewBox="0 0 74 74" aria-hidden="true">
+        <path d="M4 70 L4 4 L70 4" fill="none" stroke="#c9a45c" stroke-width="3"/>
+        <path d="M12 70 L12 12 L70 12" fill="none" stroke="#8a6a3a" stroke-width="1.5"/>
+        <path d="M4 4 L26 26" stroke="#c9a45c" stroke-width="2"/>
+        <circle cx="26" cy="26" r="7" fill="#120a06" stroke="#f1d79a" stroke-width="2"/>
+        <circle cx="26" cy="26" r="2.5" fill="#ff3b30"/>
+        <path d="M40 4 Q 46 16 58 12 M 4 40 Q 16 46 12 58" fill="none" stroke="#c9a45c" stroke-width="1.5"/>
+      </svg>
+      <svg class="corner bl" viewBox="0 0 74 74" aria-hidden="true">
+        <path d="M4 70 L4 4 L70 4" fill="none" stroke="#c9a45c" stroke-width="3"/>
+        <path d="M12 70 L12 12 L70 12" fill="none" stroke="#8a6a3a" stroke-width="1.5"/>
+        <path d="M4 4 L26 26" stroke="#c9a45c" stroke-width="2"/>
+        <circle cx="26" cy="26" r="7" fill="#120a06" stroke="#f1d79a" stroke-width="2"/>
+        <circle cx="26" cy="26" r="2.5" fill="#ff3b30"/>
+        <path d="M40 4 Q 46 16 58 12 M 4 40 Q 16 46 12 58" fill="none" stroke="#c9a45c" stroke-width="1.5"/>
+      </svg>
+      <svg class="corner br" viewBox="0 0 74 74" aria-hidden="true">
+        <path d="M4 70 L4 4 L70 4" fill="none" stroke="#c9a45c" stroke-width="3"/>
+        <path d="M12 70 L12 12 L70 12" fill="none" stroke="#8a6a3a" stroke-width="1.5"/>
+        <path d="M4 4 L26 26" stroke="#c9a45c" stroke-width="2"/>
+        <circle cx="26" cy="26" r="7" fill="#120a06" stroke="#f1d79a" stroke-width="2"/>
+        <circle cx="26" cy="26" r="2.5" fill="#ff3b30"/>
+        <path d="M40 4 Q 46 16 58 12 M 4 40 Q 16 46 12 58" fill="none" stroke="#c9a45c" stroke-width="1.5"/>
+      </svg>
+      <svg class="medal" viewBox="-32 -30 64 56" aria-hidden="true">
+        <path d="M0 -27 L 29 23 L -29 23 Z" fill="#120a06" stroke="#f1d79a" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M-15 8 Q 0 -5 15 8 Q 0 18 -15 8 Z" fill="#e6cdb0"/>
+        <g class="m-iris"><circle cx="0" cy="8" r="5.5" fill="#9b111e"/><circle cx="0" cy="8" r="2" fill="#000"/></g>
+        <path d="M-15 8 Q 0 -5 15 8" fill="none" stroke="#000" stroke-width="1.5"/>
+      </svg>
+      <div class="plate">序幕 · 睁眼</div>
+
+      <div class="stage"></div>
+      <div class="hud" aria-hidden="true"><span class="act-label"></span><span class="yr">∞</span></div>
+      <div class="titlecard" aria-hidden="true"><span class="num"></span><span class="name"></span><span class="yr"></span></div>
+      <div class="dialog" aria-live="polite">
+        <div class="who"></div>
+        <div class="text"></div>
+        <div class="more" aria-hidden="true">▼</div>
+      </div>
+    </div>
+
+    <nav class="controls" aria-label="控制">
+      <button type="button" id="btnPrev" title="上一幕（←）">◀<span class="label"> 上一幕</span></button>
+      <div class="timeline" role="list"></div>
+      <button type="button" id="btnNext" title="下一幕">▶<span class="label"> 下一幕</span></button>
+      <button type="button" id="btnAuto" aria-pressed="false" title="自动播放（A）">⟳<span class="label"> 自动</span></button>
+      <button type="button" id="btnSound" aria-pressed="false" title="声音">♪<span class="label"> 声音</span></button>
+    </nav>
+  </main>
+
+  <div class="redflash" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="hint" aria-hidden="true">点击画框 / 空格 推进 · ← 回到上一幕 · A 自动播放</div>
+
+  <div class="gate" id="gate">
+    <div class="en">THE ALL-SEEING EYE</div>
+    <h1>全知之眼</h1>
+    <p>祂不言语，也不伸手。祂只是看着——<br>看着一个孩子降生、仰望、攀登，然后飞向 4.24 光年之外。</p>
+    <button type="button">睁开眼</button>
+    <small>建议开启声音 · 使用鼠标让祂注意到你</small>
+  </div>
+
+  <div class="gate hide" id="ending">
+    <div class="en">FIN · BUT THE EYE REMAINS</div>
+    <h1>终</h1>
+    <p>被注视的，从来没有尽头。</p>
+    <button type="button">再一次降生</button>
+  </div>
+
+  <script src="js/scenes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
