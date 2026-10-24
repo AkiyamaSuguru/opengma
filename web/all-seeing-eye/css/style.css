@@ -6,6 +6,7 @@
 @property --glow { syntax: '<number>'; inherits: true; initial-value: 0.2; }
 
 :root {
+  color-scheme: dark;
   --bg: #07030a;
   --ink: #eadfc8;
   --ink-dim: #a99a86;
