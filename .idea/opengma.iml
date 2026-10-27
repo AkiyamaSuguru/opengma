@@ -9,7 +9,7 @@
       <excludeFolder url="file://$MODULE_DIR$/NoteBooks/MarimoNotes" />
       <excludeFolder url="file://$MODULE_DIR$/NoteBooks/MarimoNotes/__marimo__" />
     </content>
-    <orderEntry type="jdk" jdkName="uv (opengma)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="~/GitHub/opengma/.venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

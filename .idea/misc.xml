@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="uv (opengma)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="uv (opengma)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="~/GitHub/opengma/.venv" project-jdk-type="Python SDK" />
 </project>
