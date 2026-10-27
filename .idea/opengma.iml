@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src/GMA" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/GMA/CM" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/NoteBooks/MarimoNotes" />
       <excludeFolder url="file://$MODULE_DIR$/NoteBooks/MarimoNotes/__marimo__" />
     </content>
     <orderEntry type="jdk" jdkName="uv (opengma)" jdkType="Python SDK" />
