@@ -1,7 +1,7 @@
 [project]
 name = "opengma"
 version = "0.1.0"
-description = "Add your description here"
+description = "Open General Material Analyzer: read, analyze and plot materials characterization data (XPS, Raman, XRD)."
 readme = "README.md"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
@@ -12,4 +12,23 @@ dependencies = [
     "pandas>=3.1.0",
     "plotly>=7.1.0",
     "python-calamine>=0.9.0",
+]
+
+# 让 uv sync 把 src/GMA 以可编辑模式装进环境，这样在任何位置都能 import GMA
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "GMA"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# marimo 依赖的 anyio 自带 pytest 插件，本项目用不到，关掉以免输出无关的弃用提示
+addopts = ["-p", "no:anyio"]
+
+[dependency-groups]
+dev = [
+    "openpyxl>=3.1.5",
+    "pytest>=9.2.0",
 ]
