@@ -1,8 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Jay Ma
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 XRD 数据读取入口：用一个类统一管理不同厂商、型号仪器的数据读取。
 
 reader 约定：接收文件路径，返回元组 (df, metadata)，
-其中 df 为 pandas.DataFrame，metadata 为元数据（建议用 dict）。
+其中 df 为符合 XRD 标准数据结构（见 schema.py）的 pandas.DataFrame，
+metadata 为元数据（建议用 dict）。
 """
 from __future__ import annotations
 
@@ -11,7 +14,9 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from .Dloader.Bruker import reader_d8advance
+from ..common.data import require_columns
+from .DLoader.Bruker import reader_d8advance
+from .schema import PATTERN_COLUMNS
 
 # 仪器型号 -> reader 函数；新增仪器时在这里注册
 READERS: dict[str, Callable] = {
@@ -53,4 +58,5 @@ class XRDLoader:
             raise TypeError(
                 f"df must be a pandas DataFrame, got {type(df).__name__}"
             )
+        require_columns(df, PATTERN_COLUMNS)
         return XRDResult(df, metadata)
