@@ -137,7 +137,7 @@ plotter.plot_pattern_interactive(patterns, references=references).show()
 
 | Loader | 仪器名 | 读取的文件 | 读取方法 | 返回 |
 | --- | --- | --- | --- | --- |
-| `XPSLoader` | `"Avantage"` | Thermo Fisher Avantage 导出的 Excel | 全谱 `read_survey(path)`，元素谱 `read_element(path, peaks=None)` | DataFrame |
+| `XPSLoader` | `"Avantage"` | Thermo Fisher Avantage 导出的 Excel（.xls 或 .xlsx） | 全谱 `read_survey(path)`，元素谱 `read_element(path, peaks=None)` | DataFrame |
 | `RamanLoader` | `"Horiba HR evolution"` | Horiba LabSpec 导出的 txt | `read(path)` | `(data, metadata)` |
 | `XRDLoader` | `"D8 Advance"` | Bruker 衍射仪导出的 txt | `read(path)` | `(data, metadata)` |
 

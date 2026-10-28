@@ -38,6 +38,18 @@ def test_xps_wrong_peak_count(avantage_files):
         XPSLoader("Avantage").read_element(avantage_files["element"], peaks=["C-Si"])
 
 
+def test_xps_reads_legacy_xls_like_xlsx(avantage_xls_pairs):
+    """旧版 .xls 与内容相同的 .xlsx 读出的结果一致：读取引擎由 pandas 按文件格式自动选择。"""
+    loader = XPSLoader("Avantage")
+    for name, (xls, xlsx) in avantage_xls_pairs.items():
+        # 确实是旧版 .xls（OLE2 复合文档），不是改了扩展名的 .xlsx
+        assert xls.read_bytes().startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+        read = loader.read_survey if name == "survey" else loader.read_element
+        df = read(xls)
+        assert len(df) == 21
+        pd.testing.assert_frame_equal(df, read(xlsx), check_dtype=False)
+
+
 def test_xps_custom_reader_and_checks():
     good = pd.DataFrame({"Binding Energy (eV)": [1.0, 2.0], "Intensity": [3.0, 4.0]})
     bad = pd.DataFrame({"BE": [1.0], "Counts": [2.0]})

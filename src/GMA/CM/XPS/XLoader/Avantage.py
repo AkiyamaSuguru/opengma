@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-读取 Thermo Fisher Scientific 仪器经 Avantage 软件处理后导出的 Excel 数据。
+读取 Thermo Fisher Scientific 仪器经 Avantage 软件处理后导出的 Excel 数据（.xls 或 .xlsx）。
 
 reader 接收文件路径，返回符合 XPS 标准数据结构（见 XPS/schema.py）的 pandas.DataFrame：
 - 全谱：["Binding Energy (eV)", "Intensity"]
@@ -18,9 +18,9 @@ HEADER_ROWS = 15  # Avantage 导出文件中数据表之前的说明行数
 
 
 def _read_avantage_excel(file_path) -> pd.DataFrame:
-    """读取 Avantage 导出的 Excel，去掉整列为空的列（导出文件中常有空列）。"""
-    # 显式指定 openpyxl：pandas 以后会把默认引擎换成 calamine，写明可以保持读取结果不变
-    df = pd.read_excel(file_path, skiprows=HEADER_ROWS, engine="openpyxl")
+    """读取 Avantage 导出的 Excel（.xls 或 .xlsx），去掉整列为空的列（导出文件中常有空列）。"""
+    # 读取引擎由 pandas 按文件格式自动选择：依赖中的 openpyxl 读 .xlsx，python-calamine 读旧版 .xls
+    df = pd.read_excel(file_path, skiprows=HEADER_ROWS)
     return df.dropna(axis=1, how="all")
 
 
