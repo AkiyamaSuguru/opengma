@@ -1,3 +1,4 @@
-from .XLoader.Avantage import survey_reader,element_reader
+from .loader import XPSLoader
+from .ploter import XPSPlotter
 
-__all__ = ["survey_reader","element_reader"]
+__all__ = ["XPSLoader", "XPSPlotter"]

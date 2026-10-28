@@ -349,15 +349,27 @@ def style_mpl_axes(ax, hide_y_ticks=False) -> None:
     ax.tick_params(axis="both", direction="in", length=3, width=0.8)
 
 
-def add_mpl_legend(ax, loc="best") -> None:
-    """图例字号为正文的 0.75 倍、无边框；没有带标签的曲线时不画图例。"""
+def add_mpl_legend(ax, loc="best", title=None, title_scale=1.2) -> bool:
+    """
+    图例字号为正文的 0.75 倍、无边框；没有带标签的曲线时不画图例。
+
+    title 不为 None 时作为图例标题（粗体，字号为正文的 title_scale 倍），
+    与图例一起定位，不会互相遮挡。返回是否画了图例。
+    """
     handles, _ = ax.get_legend_handles_labels()
-    if handles:
-        ax.legend(
-            fontsize=0.75 * mpl.rcParams["font.size"],
-            frameon=False,
-            loc=loc,
-        )
+    if not handles:
+        return False
+
+    base = mpl.rcParams["font.size"]
+    ax.legend(
+        fontsize=0.75 * base,
+        frameon=False,
+        loc=loc,
+        title=title,
+        title_fontproperties={"weight": "bold", "size": title_scale * base},
+        alignment="left",
+    )
+    return True
 
 
 def make_subplot_grid(n_plots: int, n_cols=3, figsize=None):

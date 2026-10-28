@@ -244,7 +244,8 @@ def plot_element_static(
     Parameters
     ----------
     data : pd.DataFrame 或 dict[str, pd.DataFrame]
-        多条谱时 key 为子图标签（如 "C 1s"），写在子图左上角。
+        多条谱时 key 为子图标签（如 "C 1s"）。显示图例时作为图例标题，
+        与图例一起定位，不会被图例遮挡；不显示图例时写在子图左上角。
     palette : 通用色卡名或颜色列表，可选
         None 时使用 color_tables.py 中的 DEFAULT_PALETTE。
     component_colors : {分峰名: 颜色}，可选
@@ -267,6 +268,9 @@ def plot_element_static(
     fig, axes（二维数组；单个元素时为 1×1）
     """
     dfs = as_mapping(data)
+    # 图例在这里统一添加，子图标签作为图例标题，避免两者重叠
+    show_legend = draw_kwargs.pop("show_legend", True)
+    legend_loc = draw_kwargs.pop("legend_loc", "best")
 
     with mpl_style(font_family, font_size, use_latex):
         fig, axes = make_subplot_grid(len(dfs), n_cols, figsize)
@@ -278,10 +282,15 @@ def plot_element_static(
                 palette=palette,
                 component_colors=component_colors,
                 raw_line_color=_for_subplot(raw_line_color, key),
+                show_legend=False,
                 **draw_kwargs,
             )
-            if key != "":
-                add_subplot_label(ax, key, label_scale)
+            label = str(key) if key != "" else None
+            has_legend = show_legend and add_mpl_legend(
+                ax, legend_loc, title=label, title_scale=label_scale
+            )
+            if label and not has_legend:
+                add_subplot_label(ax, label, label_scale)
 
         finish_figure(fig, save_path, dpi, show)
 
