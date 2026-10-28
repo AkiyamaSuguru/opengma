@@ -27,6 +27,8 @@ module-name = "GMA"
 testpaths = ["tests"]
 # marimo 依赖的 anyio 自带 pytest 插件，本项目用不到，关掉以免输出无关的弃用提示
 addopts = ["-p", "no:anyio"]
+# pandas 提示以后读取 .xlsx 的默认引擎会从 openpyxl 改为 calamine；两者都在依赖中，与测试无关
+filterwarnings = ["ignore:The default engine for reading 'xlsx' files:DeprecationWarning"]
 
 [dependency-groups]
 dev = [

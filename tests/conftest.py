@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """测试用的模拟数据：XPS、Raman、XRD 的标准数据结构，以及仪器导出文件。"""
 import logging
+from pathlib import Path
 
 import matplotlib
 
@@ -120,28 +121,78 @@ def xrd_patterns():
 # ============================================================
 # 仪器导出文件
 # ============================================================
+DATA_DIR = Path(__file__).parent / "data"
+
+
+def write_avantage_xlsx(path, df, header):
+    """按 Avantage 导出 Excel 的版式写入 .xlsx：15 行说明、表头，第二列为空列。"""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    for i in range(15):
+        sheet.append([f"Avantage header line {i}"])
+    sheet.append(header)
+    for row in df.itertuples(index=False):
+        sheet.append([row[0], None, *row[1:]])
+    workbook.save(path)
+    return path
+
+
 @pytest.fixture
 def avantage_files(tmp_path, c1s, surveys):
-    """Avantage 导出的 Excel：15 行说明、表头、第二列为空列。"""
-
-    def export(name, df, header):
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-        for i in range(15):
-            sheet.append([f"Avantage header line {i}"])
-        sheet.append(header)
-        for row in df.itertuples(index=False):
-            sheet.append([row[0], None, *row[1:]])
-        path = tmp_path / name
-        workbook.save(path)
-        return path
-
+    """Avantage 导出的 .xlsx：全谱、拟合后的元素谱、未拟合的元素谱。"""
     element_header = ["Binding Energy (E)", None, "Counts / s", "Envelope", "C1s A", "C1s B", "Backgnd."]
     raw = c1s[["Binding Energy (eV)", "Intensity"]]
     return {
-        "survey": export("survey.xlsx", surveys["As-deposited"], ["Binding Energy (E)", None, "Counts / s"]),
-        "element": export("C1s.xlsx", c1s, element_header),
-        "element_raw": export("C1s_raw.xlsx", raw, ["Binding Energy (E)", None, "Counts / s"]),
+        "survey": write_avantage_xlsx(
+            tmp_path / "survey.xlsx", surveys["As-deposited"], ["Binding Energy (E)", None, "Counts / s"],
+        ),
+        "element": write_avantage_xlsx(tmp_path / "C1s.xlsx", c1s, element_header),
+        "element_raw": write_avantage_xlsx(
+            tmp_path / "C1s_raw.xlsx", raw, ["Binding Energy (E)", None, "Counts / s"],
+        ),
+    }
+
+
+def avantage_xls_tables():
+    """
+    tests/data/ 中旧版 .xls 文件的内容：{名称: (表头, 数据)}。
+
+    这些 .xls 是把同样的数据按 Avantage 版式写成 .xlsx，再用 LibreOffice 另存为
+    Excel 97-2003 格式得到的。数据都取整数，两种格式读出的数值完全相同。
+    """
+    i = np.arange(21.0)
+    sign = 1.0 - 2.0 * (i % 2)
+    survey = pd.DataFrame({
+        "BE": 1200.0 - 60.0 * i,
+        "Counts": 2000.0 + 20.0 * sign + 6000.0 * (i == 15) + 3000.0 * (i == 11),
+    })
+    background = 500.0 + 10.0 * i
+    peak_a = np.maximum(0.0, 2000.0 - 400.0 * np.abs(i - 13))
+    peak_b = np.maximum(0.0, 1000.0 - 250.0 * np.abs(i - 7))
+    element = pd.DataFrame({
+        "BE": 290.0 - 0.5 * i,
+        "Counts": background + peak_a + peak_b + 15.0 * sign,
+        "Envelope": background + peak_a + peak_b,
+        "C1s A": background + peak_a,
+        "C1s B": background + peak_b,
+        "Backgnd.": background,
+    })
+    element_header = ["Binding Energy (E)", None, "Counts / s", "Envelope", "C1s A", "C1s B", "Backgnd."]
+    return {
+        "survey": (["Binding Energy (E)", None, "Counts / s"], survey),
+        "element": (element_header, element),
+    }
+
+
+@pytest.fixture
+def avantage_xls_pairs(tmp_path):
+    """tests/data/ 中的旧版 .xls，以及内容相同的 .xlsx：{名称: (xls 路径, xlsx 路径)}。"""
+    return {
+        name: (
+            DATA_DIR / f"avantage_{name}.xls",
+            write_avantage_xlsx(tmp_path / f"avantage_{name}.xlsx", df, header),
+        )
+        for name, (header, df) in avantage_xls_tables().items()
     }
 
 
