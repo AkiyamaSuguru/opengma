@@ -11,6 +11,7 @@ logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import openpyxl  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
@@ -122,7 +123,6 @@ def xrd_patterns():
 @pytest.fixture
 def avantage_files(tmp_path, c1s, surveys):
     """Avantage 导出的 Excel：15 行说明、表头、第二列为空列。"""
-    openpyxl = pytest.importorskip("openpyxl")
 
     def export(name, df, header):
         workbook = openpyxl.Workbook()

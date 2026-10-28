@@ -19,7 +19,8 @@ HEADER_ROWS = 15  # Avantage 导出文件中数据表之前的说明行数
 
 def _read_avantage_excel(file_path) -> pd.DataFrame:
     """读取 Avantage 导出的 Excel，去掉整列为空的列（导出文件中常有空列）。"""
-    df = pd.read_excel(file_path, skiprows=HEADER_ROWS, engine="calamine")
+    # 显式指定 openpyxl：pandas 以后会把默认引擎换成 calamine，写明可以保持读取结果不变
+    df = pd.read_excel(file_path, skiprows=HEADER_ROWS, engine="openpyxl")
     return df.dropna(axis=1, how="all")
 
 
