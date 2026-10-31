@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1563" viewBox="0 0 1000 1563" role="img" aria-labelledby="t d">
+<title id="t">从原始数据到科学结论：数据准备、分析与可视化流程</title>
+<desc id="d">实验、模拟与元数据经载入、清理、改写成为干净的结构化数据；随后在理论驱动与探索驱动下于分析和可视化之间迭代，最后经解释与交流形成可信的科学结论。据 Scopatz 与 Huff《Python物理学高效计算》图 7-1 重绘并改编。</desc>
+<defs>
+<style>.s{font-family:'Noto Sans SC','Noto Sans CJK SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB','WenQuanYi Micro Hei',sans-serif}.m{font-family:'JetBrains Mono','SF Mono','SFMono-Regular',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace}</style>
+<linearGradient id="cyl" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#344257"/><stop offset="0.45" stop-color="#4C5C75"/><stop offset="1" stop-color="#344257"/></linearGradient>
+<filter id="sh" x="-10%" y="-25%" width="120%" height="160%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="7"/><feOffset dy="4" result="o"/><feFlood flood-color="#0F172A" flood-opacity="0.07"/><feComposite in2="o" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<marker id="mN" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M1.5,1.5 L10.5,6 L1.5,10.5 Q4.2,6 1.5,1.5 Z" fill="#A7B4C4"/></marker>
+<marker id="mT" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M1.5,1.5 L10.5,6 L1.5,10.5 Q4.2,6 1.5,1.5 Z" fill="#2F5BB7"/></marker>
+<marker id="mE" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M1.5,1.5 L10.5,6 L1.5,10.5 Q4.2,6 1.5,1.5 Z" fill="#E0703A"/></marker>
+</defs>
+<rect x="0.5" y="0.5" width="999" height="1562" rx="28" fill="#FBFBF9" stroke="#E7E5E0" stroke-width="1"/>
+<text class="s" x="500" y="60" font-size="12" fill="#94A3B8" font-weight="600" text-anchor="middle" letter-spacing="2.6">FROM RAW DATA TO SCIENTIFIC CONCLUSIONS</text>
+<text class="s" x="500" y="101" font-size="32" fill="#1E293B" font-weight="700" text-anchor="middle">从原始数据到科学结论</text>
+<text class="s" x="500" y="135" font-size="16" fill="#475569" text-anchor="middle">数据准备 · 分析 · 可视化 · 解释</text>
+<path d="M160,188 V262 A90,13 0 0 0 340,262 V188 Z" fill="url(#cyl)"/>
+<ellipse cx="250" cy="188" rx="90" ry="13" fill="#64758E" stroke="#7A8AA2" stroke-width="1"/>
+<text class="s" x="250" y="234" font-size="18" fill="#FFFFFF" font-weight="700" text-anchor="middle">实验数据</text>
+<text class="s" x="250" y="256" font-size="12.5" fill="#CBD5E1" text-anchor="middle">XRD · Raman · XPS …</text>
+<path d="M410,188 V262 A90,13 0 0 0 590,262 V188 Z" fill="url(#cyl)"/>
+<ellipse cx="500" cy="188" rx="90" ry="13" fill="#64758E" stroke="#7A8AA2" stroke-width="1"/>
+<text class="s" x="500" y="234" font-size="18" fill="#FFFFFF" font-weight="700" text-anchor="middle">模拟数据</text>
+<text class="s" x="500" y="256" font-size="12.5" fill="#CBD5E1" text-anchor="middle">计算与模拟输出</text>
+<path d="M660,188 V262 A90,13 0 0 0 840,262 V188 Z" fill="url(#cyl)"/>
+<ellipse cx="750" cy="188" rx="90" ry="13" fill="#64758E" stroke="#7A8AA2" stroke-width="1"/>
+<text class="s" x="750" y="234" font-size="18" fill="#FFFFFF" font-weight="700" text-anchor="middle">元数据</text>
+<text class="s" x="750" y="256" font-size="12.5" fill="#CBD5E1" text-anchor="middle">仪器参数 · 样品信息</text>
+<path d="M250,278 V291 Q250,303 262,303 H500" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M750,278 V291 Q750,303 738,303 H500" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M500,278 V339" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<rect x="100" y="343" width="800" height="120" rx="18" fill="#EEF4FB" stroke="#C8D9EE" stroke-width="1.2" filter="url(#sh)"/>
+<circle cx="140" cy="383" r="15" fill="#3567A6"/>
+<text class="s" x="140" y="388.4" font-size="15" fill="#FFFFFF" font-weight="700" text-anchor="middle">1</text>
+<text class="s" x="166" y="391" font-size="21" fill="#1E293B" font-weight="700">载入数据</text>
+<text class="s" x="262" y="390.5" font-size="12" fill="#3567A6" font-weight="600" letter-spacing="2">LOAD</text>
+<text class="s" x="872" y="389" font-size="14" fill="#475569" text-anchor="end">转成可供分析的格式</text>
+<text class="s" x="128" y="431" font-size="13.5" fill="#64748B">中间存储格式</text>
+<rect x="225" y="411" width="51.3" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="238" y="431.3" font-size="14" fill="#244B7C">CSV</text>
+<rect x="284.3" y="411" width="59.7" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="297.3" y="431.3" font-size="14" fill="#244B7C">HDF5</text>
+<rect x="352" y="411" width="51.3" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="365" y="431.3" font-size="14" fill="#244B7C">SQL</text>
+<rect x="411.3" y="411" width="59.7" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="424.3" y="431.3" font-size="14" fill="#244B7C">FITS</text>
+<rect x="479" y="411" width="59.7" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="492" y="431.3" font-size="14" fill="#244B7C">ENDF</text>
+<rect x="546.7" y="411" width="68.1" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="559.7" y="431.3" font-size="14" fill="#244B7C">ENSDF</text>
+<rect x="622.9" y="411" width="34.4" height="30" rx="15" fill="#FFFFFF" stroke="#C8D9EE" stroke-width="1.1"/>
+<text class="m" x="635.9" y="431.3" font-size="14" fill="#244B7C">…</text>
+<path d="M500,466 V495" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<polygon points="324,499 690,499 676,551 310,551" fill="#F2F4F7" stroke="#CBD4DF" stroke-width="1.3" stroke-linejoin="round"/>
+<text class="s" x="364" y="531" font-size="16" fill="#475569" font-weight="500">内存中可访问的数据</text>
+<text class="s" x="520" y="531" font-size="11" fill="#94A3B8" font-weight="600" letter-spacing="1.6">IN-MEMORY DATA</text>
+<path d="M500,554 V583" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<rect x="100" y="587" width="800" height="236" rx="18" fill="#ECF6F4" stroke="#BFE0DA" stroke-width="1.2" filter="url(#sh)"/>
+<circle cx="140" cy="627" r="15" fill="#22857A"/>
+<text class="s" x="140" y="632.4" font-size="15" fill="#FFFFFF" font-weight="700" text-anchor="middle">2</text>
+<text class="s" x="166" y="635" font-size="21" fill="#1E293B" font-weight="700">清理数据</text>
+<text class="s" x="262" y="634.5" font-size="12" fill="#22857A" font-weight="600" letter-spacing="2">CLEAN</text>
+<text class="s" x="872" y="633" font-size="14" fill="#475569" text-anchor="end">处理缺失、错误与样式问题</text>
+<rect x="128" y="653" width="237.3" height="146" rx="12" fill="#FFFFFF" stroke="#BFE0DA" stroke-width="1.1"/>
+<text class="s" x="146" y="684" font-size="15.5" fill="#175E56" font-weight="700">缺失值</text>
+<text class="s" x="201.5" y="683.5" font-size="11" fill="#94A3B8" font-weight="600" letter-spacing="1.4">MISSING</text>
+<line x1="146" y1="698" x2="347.3" y2="698" stroke="#BFE0DA" stroke-width="1"/>
+<circle cx="151" cy="721" r="3" fill="#22857A"/>
+<text class="s" x="162" y="726" font-size="15" fill="#1E293B">丢弃</text>
+<text class="s" x="199" y="726" font-size="12.5" fill="#64748B">Drop</text>
+<circle cx="151" cy="749" r="3" fill="#22857A"/>
+<text class="s" x="162" y="754" font-size="15" fill="#1E293B">替代</text>
+<text class="s" x="199" y="754" font-size="12.5" fill="#64748B">Replace</text>
+<circle cx="151" cy="777" r="3" fill="#22857A"/>
+<text class="s" x="162" y="782" font-size="15" fill="#1E293B">计数</text>
+<text class="s" x="199" y="782" font-size="12.5" fill="#64748B">Count</text>
+<rect x="381.3" y="653" width="237.3" height="146" rx="12" fill="#FFFFFF" stroke="#BFE0DA" stroke-width="1.1"/>
+<text class="s" x="399.3" y="684" font-size="15.5" fill="#175E56" font-weight="700">问题项</text>
+<text class="s" x="454.8" y="683.5" font-size="11" fill="#94A3B8" font-weight="600" letter-spacing="1.4">IRREGULAR</text>
+<line x1="399.3" y1="698" x2="600.7" y2="698" stroke="#BFE0DA" stroke-width="1"/>
+<circle cx="404.3" cy="721" r="3" fill="#22857A"/>
+<text class="s" x="415.3" y="726" font-size="15" fill="#1E293B">检测</text>
+<text class="s" x="452.3" y="726" font-size="12.5" fill="#64748B">Detect</text>
+<circle cx="404.3" cy="749" r="3" fill="#22857A"/>
+<text class="s" x="415.3" y="754" font-size="15" fill="#1E293B">排序</text>
+<text class="s" x="452.3" y="754" font-size="12.5" fill="#64748B">Sort</text>
+<circle cx="404.3" cy="777" r="3" fill="#22857A"/>
+<text class="s" x="415.3" y="782" font-size="15" fill="#1E293B">标准化</text>
+<text class="s" x="467.3" y="782" font-size="12.5" fill="#64748B">Standardize</text>
+<rect x="634.7" y="653" width="237.3" height="146" rx="12" fill="#FFFFFF" stroke="#BFE0DA" stroke-width="1.1"/>
+<text class="s" x="652.7" y="684" font-size="15.5" fill="#175E56" font-weight="700">样式</text>
+<text class="s" x="692.7" y="683.5" font-size="11" fill="#94A3B8" font-weight="600" letter-spacing="1.4">STYLE</text>
+<line x1="652.7" y1="698" x2="854" y2="698" stroke="#BFE0DA" stroke-width="1"/>
+<circle cx="657.7" cy="721" r="3" fill="#22857A"/>
+<text class="s" x="668.7" y="726" font-size="15" fill="#1E293B">重命名</text>
+<text class="s" x="720.7" y="726" font-size="12.5" fill="#64748B">Rename</text>
+<circle cx="657.7" cy="749" r="3" fill="#22857A"/>
+<text class="s" x="668.7" y="754" font-size="15" fill="#1E293B">重新格式化</text>
+<text class="s" x="750.7" y="754" font-size="12.5" fill="#64748B">Reformat</text>
+<text class="s" x="668.7" y="782" font-size="12.5" fill="#94A3B8">字段名 · 日期 · 数字 · 字符串</text>
+<path d="M500,826 V855" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<rect x="100" y="859" width="800" height="164" rx="18" fill="#FBF4E6" stroke="#EED8AE" stroke-width="1.2" filter="url(#sh)"/>
+<circle cx="140" cy="899" r="15" fill="#B5731A"/>
+<text class="s" x="140" y="904.4" font-size="15" fill="#FFFFFF" font-weight="700" text-anchor="middle">3</text>
+<text class="s" x="166" y="907" font-size="21" fill="#1E293B" font-weight="700">改写数据</text>
+<text class="s" x="262" y="906.5" font-size="12" fill="#B5731A" font-weight="600" letter-spacing="2">MUNGE</text>
+<text class="s" x="872" y="905" font-size="14" fill="#475569" text-anchor="end">重组为分析所需的结构</text>
+<text class="s" x="128" y="947" font-size="13.5" fill="#64748B">常见操作</text>
+<rect x="211.5" y="927" width="87.3" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="224.5" y="947.3" font-size="15" fill="#1E293B">连接</text>
+<text class="s" x="260.5" y="947.3" font-size="12.5" fill="#64748B">Join</text>
+<rect x="306.8" y="927" width="92.2" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="319.8" y="947.3" font-size="15" fill="#1E293B">筛选</text>
+<text class="s" x="355.8" y="947.3" font-size="12.5" fill="#64748B">Filter</text>
+<rect x="407" y="927" width="41" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="420" y="947.3" font-size="15" fill="#64748B">…</text>
+<text class="s" x="128" y="989" font-size="13.5" fill="#64748B">结合元数据</text>
+<rect x="211.5" y="969" width="96" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="224.5" y="989.3" font-size="14" fill="#475569">生成结果表</text>
+<rect x="315.5" y="969" width="152" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="328.5" y="989.3" font-size="14" fill="#475569">标注出处编号与日期</text>
+<rect x="475.5" y="969" width="138" height="30" rx="15" fill="#FFFFFF" stroke="#EED8AE" stroke-width="1.1"/>
+<text class="s" x="488.5" y="989.3" font-size="14" fill="#475569">合并多检测器结果</text>
+<path d="M500,1026 V1055" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<polygon points="296,1059 720,1059 704,1123 280,1123" fill="#F2F4F7" stroke="#CBD4DF" stroke-width="1.3" stroke-linejoin="round"/>
+<text class="s" x="330.7" y="1087" font-size="16.5" fill="#475569" font-weight="500">清理后的结构化数据</text>
+<text class="s" x="491.2" y="1087" font-size="11" fill="#94A3B8" font-weight="600" letter-spacing="1.5">CLEAN, STRUCTURED DATA</text>
+<text class="s" x="394.8" y="1109" font-size="13" fill="#64748B">NumPy 数组 · pandas 数据框 · …</text>
+<path d="M428,1126 C428,1158.5 250,1158.5 250,1191" fill="none" stroke="#2F5BB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mT)"/>
+<path d="M572,1126 C572,1158.5 750,1158.5 750,1191" fill="none" stroke="#E0703A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 6" marker-end="url(#mE)"/>
+<text class="s" x="236" y="1180" font-size="13.5" fill="#2F5BB7" font-weight="600" text-anchor="end">理论驱动</text>
+<text class="s" x="764" y="1180" font-size="13.5" fill="#E0703A" font-weight="600">探索驱动</text>
+<rect x="100" y="1195" width="300" height="96" rx="18" fill="#F2EFFB" stroke="#D6CEF1" stroke-width="1.2" filter="url(#sh)"/>
+<circle cx="140" cy="1235" r="15" fill="#6650B5"/>
+<text class="s" x="140" y="1240.8" font-size="16" fill="#FFFFFF" font-weight="700" text-anchor="middle">Σ</text>
+<text class="s" x="166" y="1243" font-size="21" fill="#1E293B" font-weight="700">分析</text>
+<text class="s" x="220" y="1242.5" font-size="12" fill="#6650B5" font-weight="600" letter-spacing="2">ANALYZE</text>
+<text class="s" x="166" y="1270" font-size="13.5" fill="#475569">拟合 · 统计 · 不确定性估计</text>
+<rect x="600" y="1195" width="300" height="96" rx="18" fill="#F2EFFB" stroke="#D6CEF1" stroke-width="1.2" filter="url(#sh)"/>
+<circle cx="640" cy="1235" r="15" fill="#6650B5"/>
+<rect x="632.6" y="1236" width="3.8" height="6" rx="1" fill="#FFFFFF"/>
+<rect x="637.8" y="1232" width="3.8" height="10" rx="1" fill="#FFFFFF"/>
+<rect x="643" y="1228" width="3.8" height="14" rx="1" fill="#FFFFFF"/>
+<text class="s" x="666" y="1243" font-size="21" fill="#1E293B" font-weight="700">可视化</text>
+<text class="s" x="741" y="1242.5" font-size="12" fill="#6650B5" font-weight="600" letter-spacing="2">VISUALIZE</text>
+<text class="s" x="666" y="1270" font-size="13.5" fill="#475569">探索作图 · 出版级图表</text>
+<path d="M407,1228 H593" fill="none" stroke="#2F5BB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mT)"/>
+<path d="M593,1258 H407" fill="none" stroke="#E0703A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 6" marker-end="url(#mE)"/>
+<text class="s" x="500" y="1219" font-size="12.5" fill="#2F5BB7" font-weight="600" text-anchor="middle">理论驱动</text>
+<text class="s" x="500" y="1279" font-size="12.5" fill="#E0703A" font-weight="600" text-anchor="middle">探索驱动</text>
+<path d="M250,1294 V1309 Q250,1321 262,1321 H500" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M750,1294 V1309 Q750,1321 738,1321 H500" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M500,1321 V1355" fill="none" stroke="#A7B4C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mN)"/>
+<rect x="220" y="1359" width="560" height="88" rx="22" fill="#1E293B" filter="url(#sh)"/>
+<circle cx="343.3" cy="1403" r="17" fill="#F2C46D"/>
+<path d="M336.3,1403.5 L341.3,1408.5 L350.8,1398" fill="none" stroke="#1E293B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="s" x="378.3" y="1400" font-size="20" fill="#FFFFFF" font-weight="700">解释与交流</text>
+<text class="s" x="490.3" y="1400" font-size="18" fill="#8191A8">→</text>
+<text class="s" x="520.3" y="1400" font-size="20" fill="#F2C46D" font-weight="700">可信的科学结论</text>
+<text class="s" x="378.3" y="1423" font-size="11" fill="#8E9DB3" font-weight="600" letter-spacing="1.8">INTERPRET · COMMUNICATE · CONCLUDE</text>
+<path d="M258.5,1492 H292.5" fill="none" stroke="#2F5BB7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mT)"/>
+<text class="s" x="302.5" y="1497" font-size="13.5" fill="#475569">理论驱动：先分析，后可视化</text>
+<path d="M522,1492 H556" fill="none" stroke="#E0703A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 6" marker-end="url(#mE)"/>
+<text class="s" x="566" y="1497" font-size="13.5" fill="#475569">探索驱动：先可视化，后分析</text>
+<text class="s" x="500" y="1531" font-size="12.5" fill="#94A3B8" text-anchor="middle">据 A. Scopatz、K. D. Huff《Python物理学高效计算》图 7-1 重绘并改编</text>
+</svg>
