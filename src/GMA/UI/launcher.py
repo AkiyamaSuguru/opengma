@@ -14,6 +14,7 @@ import flet as ft
 
 from . import theme as th
 from .components import widgets as w
+from .components.dialogs import close, show
 from .services.text import app_version, short_path, when
 from .settings import RecentProject
 from .strings import S
@@ -160,8 +161,8 @@ class Launcher:
             title=ft.Text(S.ALL_MODULES, size=16, weight=ft.FontWeight.W_600, color=p.text),
             content=ft.Container(width=3 * CARD_W + 2 * CARD_GAP + 4,
                                  content=ft.Column(sections, spacing=10, tight=True, scroll=ft.ScrollMode.AUTO)),
-            actions=[ft.TextButton(S.CLOSE, on_click=lambda e: page.pop_dialog())])
-        page.show_dialog(dialog)
+            actions=[ft.TextButton(S.CLOSE, on_click=lambda e: close(dialog))])
+        show(page, dialog)
 
     # ============================================================
     # 最近项目

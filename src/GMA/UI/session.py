@@ -23,7 +23,10 @@ class ProjectSession:
 
     # ---------- 通知 ----------
     def subscribe(self, listener) -> None:
-        """listener(kind)：kind 为 "data"（数据或样品变了）、"saved"、"renamed" 等。"""
+        """
+        listener(kind, source)：kind 为 "data"（数据或样品变了）、"saved"、"renamed" 等；
+        source 是发起修改的标签视图（它自己已经刷新过），其他来源时为 None。
+        """
         if listener not in self._listeners:
             self._listeners.append(listener)
 
@@ -31,9 +34,9 @@ class ProjectSession:
         if listener in self._listeners:
             self._listeners.remove(listener)
 
-    def changed(self, kind: str = "data") -> None:
+    def changed(self, kind: str = "data", source=None) -> None:
         for listener in list(self._listeners):
-            listener(kind)
+            listener(kind, source)
 
     # ---------- 状态 ----------
     @property

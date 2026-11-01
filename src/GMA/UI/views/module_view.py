@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-模块标签。P2 只有外框：模块图标、支持的文件和项目中已有的数据量；导入、交互图、检查器等
-按开发计划在 P3（XPS）、P4（Raman、XRD）中实现。标签的状态原样保存，以后的版本可以直接使用。
+还没有实现的模块标签（Raman、XRD 在 P4 中实现）：模块图标、支持的文件和项目中已有的数据量。
+标签的状态原样保存，以后的版本可以直接使用。XPS 模块页见 xps_view.py。
 """
 from __future__ import annotations
 
@@ -24,6 +24,13 @@ class ModuleView(TabView):
     def state(self) -> dict:
         return self._state
 
+    def selection(self) -> str:
+        return ""
+
+    async def on_shortcut(self, key: str, shift: bool) -> bool:
+        self.app.not_yet("P4")
+        return True
+
     def build(self) -> ft.Control:
         p, spec = self.p, self.spec
         n = len(self.project.records_of(method=spec.method)) if spec.method else 0
@@ -36,6 +43,6 @@ class ModuleView(TabView):
         if n:
             lines.append(w.muted(S.MODULE_DATA.format(n=n, title=spec.title), p, th.SIZE_BODY))
         lines.append(ft.FilledButton(S.IMPORT_DATA, icon=ft.Icons.UPLOAD_FILE_OUTLINED, disabled=True,
-                                     tooltip=S.NOT_YET.format(phase="P3" if spec.key == "xps" else "P4")))
+                                     tooltip=S.NOT_YET.format(phase="P4")))
         return ft.Container(expand=True, alignment=ft.Alignment.CENTER, content=ft.Column(
             lines, spacing=12, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER))

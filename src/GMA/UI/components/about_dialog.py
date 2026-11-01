@@ -9,7 +9,7 @@ from .. import theme as th
 from ..services.text import app_version, environment
 from ..strings import S
 from . import widgets as w
-from .dialogs import toast
+from .dialogs import close, show, toast
 
 
 def show_about(app) -> None:
@@ -39,7 +39,8 @@ def show_about(app) -> None:
                      bgcolor=p.subtle, border_radius=th.RADIUS_CONTROL, padding=10),
         w.faint(S.DISCLAIMER, p),
     ], spacing=12, tight=True)
-    page.show_dialog(ft.AlertDialog(
+    box = ft.AlertDialog(
         bgcolor=p.panel, shape=ft.RoundedRectangleBorder(radius=th.RADIUS_PANEL),
         content=ft.Container(width=440, content=content),
-        actions=[ft.FilledButton(S.CLOSE, on_click=lambda e: page.pop_dialog())]))
+        actions=[ft.FilledButton(S.CLOSE, on_click=lambda e: close(box))])
+    show(page, box)

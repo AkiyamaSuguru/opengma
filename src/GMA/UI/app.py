@@ -147,8 +147,8 @@ class App:
         page.title = title
         page.controls[:] = [content]
         page.update()
-        with contextlib.suppress(Exception):
-            await page.window.center()
+        with contextlib.suppress(Exception):  # 网页版等没有窗口的环境中不会返回，不能一直等
+            await asyncio.wait_for(page.window.center(), 3)
         page.window.opacity = 1
         page.update()
         with contextlib.suppress(Exception):
@@ -318,6 +318,12 @@ class App:
 
     def not_yet(self, phase: str = "P3") -> None:
         toast(self.page, self.p, S.NOT_YET.format(phase=phase))
+
+    def toast(self, message: str) -> None:
+        toast(self.page, self.p, message)
+
+    def show_error(self, title: str, message: str, details: str | None = None) -> None:
+        show_error(self.page, self.p, title, message, details)
 
     @property
     def settings_file(self) -> Path:
