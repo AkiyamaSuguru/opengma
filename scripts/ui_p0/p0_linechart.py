@@ -14,10 +14,10 @@ P0-1：Flet 原生 LineChart 的交互与流畅度验证。
 - 重新筛选点：每次缩放只发送范围内的点。
 抽稀只是可选项，打开后会自动改用“重新筛选点”，抽稀结果随缩放范围重新计算。
 
-自动测速：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的），或者点窗口中的“自动测速”。
+自动测速：用环境变量 P0_BENCH=1 运行（run_p0.py 就是这样运行的），或者点窗口中的“自动测速”。
 依次测量各组数据的首次显示、缩放、平移、图例开关，以及几种对比设置，结果写入
 results/linechart_bench.txt；测完后窗口回到默认设置，可以继续手动操作。
-窗口看不见时（在别的桌面、被最小化或被完全挡住）macOS 不刷新它，测速会等它显示出来再继续。
+窗口看不见（在别的桌面、被最小化或被完全挡住）或者应用不在前台时，系统可能不刷新它，测速会等界面有回应再继续。
 每一步记两种时间：Python 端（准备数据并发出更新）用时；以及界面完成第 1、第 3 帧布局的时间
 （发出更新后连续改变一个 1 像素控件的宽度，等界面回报尺寸变化，第 3 帧包含了前面的绘制）。
 """
@@ -311,7 +311,7 @@ def main(page: ft.Page):
     input_logged = {"scroll": 0, "scale": 0}
 
     def log_input(kind, text):
-        if input_logged[kind] < 8:  # 只记前几次，看 macOS 送来的是哪种事件
+        if input_logged[kind] < 8:  # 只记前几次，看系统送来的是哪种事件
             input_logged[kind] += 1
             print(f"[linechart] 输入 {kind}：{text}", flush=True)
 
@@ -430,7 +430,7 @@ def main(page: ft.Page):
     # 用“探针”判断界面什么时候处理完一次更新：改变几个 1 像素控件的宽度（在 1、2、3 之间轮换，
     # 迟到的回报对不上当前宽度，不会被误认），等界面回报。哪种先回应就用哪种，并统计各自回应了多少次：
     #   size0：尺寸变化立即回报（size_change_interval=0）
-    #   size10：用默认的 10 ms 采样（图表区域的尺寸回报在 Mac 上正常，用的就是默认值）
+    #   size10：用默认的 10 ms 采样（与图表区域的尺寸回报相同）
     #   anim：带 1 ms 隐式动画，动画结束时回报。这个事件不带宽度，只计数，不用来计时
     # 处理函数写成普通函数，用 call_soon_threadsafe 通知等待中的协程。
     probe_stats = {"size0": 0, "size10": 0, "anim": 0}
@@ -493,7 +493,7 @@ def main(page: ft.Page):
         st["lo"], st["hi"] = lo + shift, hi + shift
         apply_range()
 
-    wait_text = "等界面回应：窗口在别的桌面、被最小化或被完全挡住时，macOS 不刷新它"
+    wait_text = "等界面回应：窗口看不见或应用不在前台时，系统可能不刷新它"
 
     async def wait_visible(limit=60):
         """
@@ -523,7 +523,7 @@ def main(page: ft.Page):
             return
         st["benching"] = True
         bench_btn.disabled = True
-        page.window.always_on_top = True  # 测速时置顶：被别的窗口挡住时 macOS 不刷新
+        page.window.always_on_top = True  # 测速时置顶：被别的窗口挡住时系统可能不刷新
         page.update()
         await bring_to_front(page)
         rows = []

@@ -1,15 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-P0 验证脚本共用的部分：模拟数据、抽稀、读取屏幕尺寸。
+P0 验证脚本共用的部分：模拟数据、抽稀、按比例计算窗口尺寸。
 
 这些脚本只用于验证技术方案，不属于 GMA 库，也不会被 GMA.UI 导入。
 """
 from __future__ import annotations
-
-import ctypes
-import ctypes.util
-import platform
 
 import numpy as np
 import pandas as pd
@@ -85,52 +81,12 @@ def decimate_minmax(x, y, max_points):
 
 
 # ============================================================
-# 屏幕尺寸：Flet 1.0 没有对应接口，用系统接口读取
+# 窗口尺寸：按可用屏幕区域的比例计算（可用区域由 p0_window.py 用最大化窗口测得，三个系统同一套做法）
 # ============================================================
-def _mac_screen():
-    path = ctypes.util.find_library("CoreGraphics") or "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
-    cg = ctypes.cdll.LoadLibrary(path)
-
-    class CGPoint(ctypes.Structure):
-        _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
-
-    class CGSize(ctypes.Structure):
-        _fields_ = [("width", ctypes.c_double), ("height", ctypes.c_double)]
-
-    class CGRect(ctypes.Structure):
-        _fields_ = [("origin", CGPoint), ("size", CGSize)]
-
-    cg.CGMainDisplayID.restype = ctypes.c_uint32
-    cg.CGDisplayBounds.restype = CGRect
-    cg.CGDisplayBounds.argtypes = [ctypes.c_uint32]
-    rect = cg.CGDisplayBounds(cg.CGMainDisplayID())
-    return rect.size.width, rect.size.height
-
-
-def _windows_screen():
-    user32 = ctypes.windll.user32  # type: ignore[attr-defined]
-    return float(user32.GetSystemMetrics(0)), float(user32.GetSystemMetrics(1))
-
-
-def screen_size(fallback=(1440.0, 900.0)):
-    """返回 (宽, 高, 来源)。macOS 的单位是点（与 Flet 窗口尺寸一致），读不到时返回 fallback。"""
-    system = platform.system()
-    try:
-        if system == "Darwin":
-            w, h = _mac_screen()
-            return w, h, "CoreGraphics"
-        if system == "Windows":
-            w, h = _windows_screen()
-            return w, h, "user32"
-    except Exception as exc:  # noqa: BLE001 - 验证脚本中只需要报告失败原因
-        return fallback[0], fallback[1], f"读取失败，使用默认值（{exc}）"
-    return fallback[0], fallback[1], f"{system} 未实现，使用默认值"
-
-
 def window_size(screen_w, screen_h, ratio_w, ratio_h, min_size, max_size=None):
-    """按屏幕比例计算窗口尺寸，并限制在 [min_size, max_size] 之间。"""
+    """按屏幕比例计算窗口尺寸，限制在 [min_size, max_size] 之间，并且不超过屏幕可用区域。"""
     w = max(min_size[0], screen_w * ratio_w)
     h = max(min_size[1], screen_h * ratio_h)
     if max_size:
         w, h = min(w, max_size[0]), min(h, max_size[1])
-    return round(w), round(h)
+    return round(min(w, screen_w)), round(min(h, screen_h))

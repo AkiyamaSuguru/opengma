@@ -1,15 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-P0-2：窗口尺寸按屏幕比例、同一进程换窗、关闭工作区回到启动器。
+P0-2：窗口默认尺寸按屏幕比例、同一进程换窗、关闭工作区回到启动器。
+
+Windows、macOS、Linux 用同一套做法，不为某个系统单独处理：
+- 屏幕尺寸：Flet 没有读取屏幕尺寸的接口，这里把窗口（透明时）最大化一次，读出可用区域
+  （去掉菜单栏、Dock、任务栏后）的尺寸，再还原；读不到时用默认值。
+- 两个窗口都用系统标题栏，移动、缩放、关闭都是系统自己的操作。
+- 换窗时把窗口透明度设为 0，换好内容、尺寸并居中后再设回 1。不隐藏窗口：
+  在 macOS 上隐藏唯一的窗口（window.visible = False）会让程序直接退出。
 
 运行（在仓库根目录）：
     uv run python scripts/ui_p0/p0_window.py
 
-要验证的内容见同目录 README.md。
-
-自动换窗：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的），启动后自动在启动器和工作区之间
-来回切换 3 次并记录用时，结果写入 results/window.txt，之后停在启动器，可以继续手动操作。
+自动换窗：用环境变量 P0_BENCH=1 运行，启动后自动在启动器和工作区之间来回切换 3 次并记录用时，
+结果写入 results/window.txt，之后停在启动器，可以继续手动操作。
 """
 from __future__ import annotations
 
@@ -24,10 +29,12 @@ from pathlib import Path
 import flet as ft
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _common import screen_size, window_size  # noqa: E402
+from _common import window_size  # noqa: E402
 
-LAUNCHER = dict(ratio_w=0.42, ratio_h=0.50, min_size=(560, 420), max_size=(960, 680))
-WORKSPACE = dict(ratio_w=0.80, ratio_h=0.85, min_size=(960, 640))
+MIN_SIZE = (560, 420)  # 两个窗口共用的最小尺寸
+LAUNCHER = dict(ratio_w=0.42, ratio_h=0.52, min_size=MIN_SIZE, max_size=(960, 700))
+WORKSPACE = dict(ratio_w=0.85, ratio_h=0.90, min_size=(960, 640))  # 这里的 min_size 只用于计算默认尺寸
+FALLBACK_AREA = (1440.0, 860.0)  # 读不到可用区域时假定的尺寸
 RESULTS = Path(__file__).parent / "results"
 BENCH = os.environ.get("P0_BENCH") == "1"
 
@@ -45,41 +52,31 @@ def log_line(text):
 async def main(page: ft.Page):
     page.title = "P0-2 · 换窗"
     page.padding = 0
-    sw, sh, source = screen_size()
-    state = {"mode": "launcher", "close_to_launcher": True, "swaps": []}
-    is_mac = page.platform == ft.PagePlatform.MACOS
+    state = {"mode": "launcher", "close_to_launcher": True, "swaps": [], "resized_at": 0.0, "size": None,
+             "area": FALLBACK_AREA, "area_note": "未测量"}
     info = ft.Text("", size=12, selectable=True)
     log = ft.Text("", size=12, color=ft.Colors.BLUE_GREY_600, selectable=True)
 
     def sizes_text():
-        lw, lh = window_size(sw, sh, **LAUNCHER)
-        ww, wh = window_size(sw, sh, **WORKSPACE)
-        return (f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）\n"
+        aw, ah = state["area"]
+        lw, lh = window_size(aw, ah, **LAUNCHER)
+        ww, wh = window_size(aw, ah, **WORKSPACE)
+        return (f"可用区域 {aw:.0f} × {ah:.0f}（{state['area_note']}）\n"
                 f"启动器默认 {lw} × {lh}　工作区默认 {ww} × {wh}")
 
-    # ---------- 两种界面 ----------
+    # ---------- 两种界面（都用系统标题栏） ----------
     def launcher_view():
-        header = ft.WindowDragArea(content=ft.Container(
-            content=ft.Row([
-                ft.Container(width=72 if is_mac else 0),  # macOS 左上角红黄绿按钮的位置
-                ft.Text("OpenGMA · 启动器", size=15, weight=ft.FontWeight.BOLD),
-                ft.Container(expand=True),
-                ft.IconButton(ft.Icons.CLOSE, tooltip="关闭", visible=not is_mac, on_click=close_window),
-            ]),
-            padding=ft.Padding.symmetric(horizontal=12, vertical=8), bgcolor="#EEF2F5"))
-        return ft.Column([
-            header,
-            ft.Container(padding=20, content=ft.Column([
-                ft.Text("拖动顶部灰色区域可以移动窗口；拖动边缘可以缩放窗口。", size=13),
-                info,
-                ft.Row([ft.Button("进入工作区", icon=ft.Icons.ARROW_FORWARD, on_click=to_workspace)]),
-                log,
-            ], spacing=12)),
-        ], spacing=0, expand=True)
+        return ft.Container(padding=20, expand=True, content=ft.Column([
+            ft.Text("OpenGMA · 启动器", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("用系统标题栏移动、缩放、关闭窗口；关闭启动器即退出。", size=13),
+            info,
+            ft.Row([ft.Button("进入工作区", icon=ft.Icons.ARROW_FORWARD, on_click=to_workspace)]),
+            log,
+        ], spacing=12))
 
     def workspace_view():
         return ft.Container(padding=20, expand=True, content=ft.Column([
-            ft.Text("工作区（使用系统标题栏）", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("工作区", size=18, weight=ft.FontWeight.BOLD),
             info,
             ft.Switch(label="关闭窗口时回到启动器（关闭此项则直接退出）", value=state["close_to_launcher"],
                       on_change=lambda e: state.update(close_to_launcher=bool(e.control.value))),
@@ -87,62 +84,73 @@ async def main(page: ft.Page):
             log,
         ], spacing=12))
 
+    # ---------- 可用区域：最大化一次再还原 ----------
+    async def measure_area(timeout=3.0, settle=0.3):
+        """窗口透明时最大化，等尺寸稳定（settle 秒内没有新的尺寸变化）后读出，再还原。"""
+        t0 = time.perf_counter()
+        page.window.opacity = 0
+        page.window.maximized = True
+        page.update()
+        size = None
+        while time.perf_counter() - t0 < timeout:
+            await asyncio.sleep(0.05)
+            changed_at = state["resized_at"]
+            if changed_at > t0 and time.perf_counter() - changed_at > settle and state["size"]:
+                size = state["size"]
+                break
+        page.window.maximized = False
+        page.update()
+        t1 = time.perf_counter()  # 等还原完成，否则还原会覆盖接下来设定的尺寸
+        while time.perf_counter() - t1 < timeout:
+            await asyncio.sleep(0.05)
+            if state["resized_at"] > t1 and time.perf_counter() - state["resized_at"] > settle:
+                break
+        ms = 1000 * (time.perf_counter() - t0)
+        if size is None:
+            state["area"], state["area_note"] = FALLBACK_AREA, f"没有读到，用默认值（等了 {ms:.0f} ms）"
+        else:
+            state["area"], state["area_note"] = size, f"最大化窗口测得，用时 {ms:.0f} ms"
+        log_line(f"可用区域 {state['area'][0]:.0f} × {state['area'][1]:.0f}（{state['area_note']}）")
+
     # ---------- 换窗 ----------
-    async def show(view, title_bar_hidden, size, min_size, resizable=True, how="opacity"):
-        """
-        换窗：先让窗口看不见，换内容、尺寸、标题栏，居中后再显示。
-        how="opacity" 把窗口透明度设为 0（窗口仍在）；how="hide" 隐藏窗口。
-        第一轮在 Mac 上窗口一启动就关掉了，怀疑与隐藏窗口有关，所以每一步都记一行。
-        """
+    async def show(view, size):
+        """换窗：透明度设为 0，换内容和尺寸，居中后再设回 1。"""
         t0 = time.perf_counter()
         name = "工作区" if state["mode"] == "workspace" else "启动器"
-
-        def mark(text):
-            log_line(f"  {name}·{how}：{text}（{1000 * (time.perf_counter() - t0):.0f} ms）")
-
-        if how == "hide":
-            page.window.visible = False
-        else:
-            page.window.opacity = 0
+        page.window.opacity = 0
         page.update()
-        mark("已隐藏")
-        page.window.title_bar_hidden = title_bar_hidden
-        page.window.title_bar_buttons_hidden = False
-        page.window.min_width, page.window.min_height = min_size
         page.window.width, page.window.height = size
-        page.window.resizable = resizable
         page.controls.clear()
         page.add(view)
-        mark("已换内容和尺寸")
         await page.window.center()
-        mark("已居中")
-        if how == "hide":
-            page.window.visible = True
-        else:
-            page.window.opacity = 1
+        page.window.opacity = 1
         page.update()
         await bring_to_front(page)
         dt = (time.perf_counter() - t0) * 1000
         info.value = sizes_text() + f"\n当前窗口设定 {size[0]} × {size[1]}"
         log.value = f"上一次换窗用时 {dt:.0f} ms（请留意换窗时是否闪烁、位置是否居中）"
         page.update()
-        state["swaps"].append((state["mode"], how, dt))
-        log_line(f"换到{name}（{how}）：{dt:.0f} ms，设定 {size[0]} × {size[1]}")
+        state["swaps"].append((state["mode"], dt))
+        log_line(f"换到{name}：{dt:.0f} ms，设定 {size[0]} × {size[1]}")
 
-    async def to_workspace(e=None, how="opacity"):
+    async def to_workspace(e=None):
         state["mode"] = "workspace"
-        await show(workspace_view(), False, window_size(sw, sh, **WORKSPACE), WORKSPACE["min_size"], how=how)
+        await show(workspace_view(), window_size(*state["area"], **WORKSPACE))
 
-    async def to_launcher(e=None, how="opacity"):
+    async def to_launcher(e=None):
         state["mode"] = "launcher"
-        await show(launcher_view(), True, window_size(sw, sh, **LAUNCHER), LAUNCHER["min_size"], how=how)
+        await show(launcher_view(), window_size(*state["area"], **LAUNCHER))
 
     async def close_window(e=None):
         page.window.prevent_close = False
         await page.window.destroy()
 
     async def on_window_event(e: ft.WindowEvent):
-        if e.type in (ft.WindowEventType.RESIZED, ft.WindowEventType.MOVED):
+        if e.type == ft.WindowEventType.RESIZED:
+            state["resized_at"] = time.perf_counter()
+            state["size"] = (page.window.width, page.window.height)
+        if e.type in (ft.WindowEventType.RESIZED, ft.WindowEventType.MOVED, ft.WindowEventType.MAXIMIZE,
+                      ft.WindowEventType.UNMAXIMIZE):
             w = page.window
             log_line(f"窗口事件 {e.type.value}：位置 ({w.left}, {w.top})，尺寸 {w.width} × {w.height}")
             return
@@ -161,31 +169,27 @@ async def main(page: ft.Page):
             await asyncio.sleep(1.5)
             await to_launcher()
             await asyncio.sleep(1.5)
-        lines = [f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）",
-                 f"启动器默认 {window_size(sw, sh, **LAUNCHER)}，工作区默认 {window_size(sw, sh, **WORKSPACE)}"]
+        aw, ah = state["area"]
+        lines = [f"可用区域 {aw:.0f} × {ah:.0f}（{state['area_note']}）",
+                 f"启动器默认 {window_size(aw, ah, **LAUNCHER)}，工作区默认 {window_size(aw, ah, **WORKSPACE)}"]
         for mode, name in (("workspace", "进入工作区"), ("launcher", "回到启动器")):
-            times = [dt for m, how, dt in state["swaps"][1:] if m == mode and how == "opacity"]  # 第一次打开不计
+            times = [dt for m, dt in state["swaps"][1:] if m == mode]  # 第一次打开启动器不计
             if times:
-                lines.append(f"{name}（透明度方式）：{len(times)} 次，中位数 {statistics.median(times):.0f} ms，"
+                lines.append(f"{name}：{len(times)} 次，中位数 {statistics.median(times):.0f} ms，"
                              f"最慢 {max(times):.0f} ms")
         RESULTS.mkdir(exist_ok=True)
         (RESULTS / "window.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
         for line in lines:
             log_line(line)
-        # 最后单独试一次“隐藏窗口”的换窗方式，看它是不是让窗口关掉的原因
-        log_line("开始测试隐藏窗口的换窗方式")
-        await to_workspace(how="hide")
-        await asyncio.sleep(1.5)
-        await to_launcher(how="hide")
-        log_line("隐藏窗口的换窗方式正常")
-        with (RESULTS / "window.txt").open("a", encoding="utf-8") as f:
-            f.write("隐藏窗口的换窗方式也正常\n")
         log.value = "自动换窗完成，现在可以手动操作。" + log.value
         page.update()
 
+    # 最小尺寸只设一次，两个窗口共用：换窗时改最小尺寸，有的系统会先按旧的最小尺寸调整大小
+    # （Linux 上从工作区回到启动器时窗口停在 960 × 640）。工作区缩得更小时由界面自己适应。
+    page.window.min_width, page.window.min_height = MIN_SIZE
     page.window.prevent_close = True
     page.window.on_event = on_window_event
-    log_line(f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）")
+    await measure_area()
     await to_launcher()
     if BENCH:
         page.run_task(bench)
