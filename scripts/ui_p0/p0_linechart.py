@@ -13,12 +13,24 @@ P0-1：Flet 原生 LineChart 的交互与流畅度验证。
   LineChart 本身不裁剪范围外的曲线，所以坐标轴和网格线由本脚本自己画在图表外面。
 - 重新筛选点：每次缩放只发送范围内的点。
 抽稀只是可选项，打开后会自动改用“重新筛选点”，抽稀结果随缩放范围重新计算。
+
+自动测速：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的）。窗口打开后依次测量各组数据的
+首次显示、缩放、平移、图例开关，以及几种对比设置，结果写入 results/linechart_bench.txt；
+测完后窗口回到默认设置，可以继续手动操作。
+每一步记两种时间：Python 端（准备数据并发出更新）用时；以及界面完成第 1、第 3 帧布局的时间
+（发出更新后连续改变一个 1 像素控件的宽度，等界面回报尺寸变化，第 3 帧包含了前面的绘制）。
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import math
+import os
+import platform
+import statistics
 import sys
 import time
+import unicodedata
 from pathlib import Path
 
 import flet as ft
@@ -34,6 +46,8 @@ XPS_COLORS = {"Raw data": "#2B3A42", "Fit": "#D1495B", "Background": "#8A979E",
 AXIS_W, AXIS_H = 64, 22          # 左侧、下方坐标轴区域的尺寸（像素）
 GRID, LABEL = "#E7EEF0", "#50656B"
 TRANSPARENT = "#00000000"
+RESULTS = Path(__file__).parent / "results"
+BENCH = os.environ.get("P0_BENCH") == "1"
 
 
 class IsolatedSeries(fch.LineChartData):
@@ -95,6 +109,7 @@ def main(page: ft.Page):
         "custom_tip": False, "isolate": True, "hidden": set(), "series": [], "reversed": False, "origin": 0.0,
         "xmin": 0.0, "xmax": 1.0, "lo": 0.0, "hi": 1.0, "ylo": 0.0, "yhi": 1.0,
         "w": 900.0, "h": 480.0, "shown": [], "last_wheel": 0.0, "chart": None, "data": [],
+        "last": {}, "probe_w": 1, "probe_event": None,
     }
 
     status = ft.Text("把鼠标移到曲线上，读数显示在这里", size=12, color=ft.Colors.BLUE_GREY_700, selectable=True)
@@ -234,6 +249,8 @@ def main(page: ft.Page):
                         f"构建 {1000 * build:.0f} ms · 发送 {1000 * send:.0f} ms{extra}")
         range_text.value = f"范围 {st['lo']:.3f} – {st['hi']:.3f}"
         fast_note.value = "当前：缩放只改坐标范围" if fast_mode() else "当前：缩放时重新筛选点"
+        st["last"] = {"kind": kind, "total": total}
+        print(f"[linechart] {timing.value}", flush=True)
         page.update()
 
     def apply_range():
@@ -328,32 +345,168 @@ def main(page: ft.Page):
         then()
 
     slider.on_change_end = on_slider_end
-    controls = ft.Row([
-        ft.Dropdown(label="数据", value="xrd5", width=230, dense=True, text_size=13,
-                    on_select=lambda e: set_and("key", e.control.value, load), options=[
-                        ft.DropdownOption(key="xrd1", text="XRD · 1 条"),
-                        ft.DropdownOption(key="xrd5", text="XRD · 5 条叠加"),
-                        ft.DropdownOption(key="xps", text="XPS C1s（横轴反向）")]),
-        ft.Dropdown(label="XRD 步长", value="0.01", width=130, dense=True, text_size=13,
-                    on_select=lambda e: set_and("step", float(e.control.value), load), options=[
-                        ft.DropdownOption(key="0.02", text="0.02°"), ft.DropdownOption(key="0.01", text="0.01°"),
-                        ft.DropdownOption(key="0.005", text="0.005°")]),
-        ft.Dropdown(label="缩放方式", value="clip", width=170, dense=True, text_size=13,
-                    on_select=lambda e: set_and("zoom_mode", e.control.value, full_rebuild), options=[
-                        ft.DropdownOption(key="clip", text="只改范围"),
-                        ft.DropdownOption(key="filter", text="重新筛选点")]),
-        ft.Dropdown(label="显示点数", value="all", width=200, dense=True, text_size=13,
-                    on_select=lambda e: set_and("density", e.control.value, full_rebuild), options=[
-                        ft.DropdownOption(key="all", text="全部（不抽稀）"),
-                        ft.DropdownOption(key="max", text="抽稀到每条 N 点"),
-                        ft.DropdownOption(key="pixel", text="按屏幕像素抽稀")]),
-        ft.TextField(label="N", value="4000", width=90, dense=True, text_size=13,
-                     on_submit=lambda e: set_and("max_points", max(100, int(e.control.value or 4000)), full_rebuild)),
-        ft.Switch(label="悬停提示带横轴值", value=False,
-                  on_change=lambda e: set_and("custom_tip", bool(e.control.value), full_rebuild)),
-        ft.Switch(label="曲线数据隔离更新", value=True,
-                  on_change=lambda e: set_and("isolate", bool(e.control.value), full_rebuild)),
-    ], spacing=12, wrap=True)
+    dd_data = ft.Dropdown(label="数据", value="xrd5", width=230, dense=True, text_size=13,
+                          on_select=lambda e: set_and("key", e.control.value, load), options=[
+                              ft.DropdownOption(key="xrd1", text="XRD · 1 条"),
+                              ft.DropdownOption(key="xrd5", text="XRD · 5 条叠加"),
+                              ft.DropdownOption(key="xps", text="XPS C1s（横轴反向）")])
+    dd_step = ft.Dropdown(label="XRD 步长", value="0.01", width=130, dense=True, text_size=13,
+                          on_select=lambda e: set_and("step", float(e.control.value), load), options=[
+                              ft.DropdownOption(key="0.02", text="0.02°"), ft.DropdownOption(key="0.01", text="0.01°"),
+                              ft.DropdownOption(key="0.005", text="0.005°")])
+    dd_zoom = ft.Dropdown(label="缩放方式", value="clip", width=170, dense=True, text_size=13,
+                          on_select=lambda e: set_and("zoom_mode", e.control.value, full_rebuild), options=[
+                              ft.DropdownOption(key="clip", text="只改范围"),
+                              ft.DropdownOption(key="filter", text="重新筛选点")])
+    dd_density = ft.Dropdown(label="显示点数", value="all", width=200, dense=True, text_size=13,
+                             on_select=lambda e: set_and("density", e.control.value, full_rebuild), options=[
+                                 ft.DropdownOption(key="all", text="全部（不抽稀）"),
+                                 ft.DropdownOption(key="max", text="抽稀到每条 N 点"),
+                                 ft.DropdownOption(key="pixel", text="按屏幕像素抽稀")])
+    tf_n = ft.TextField(label="N", value="4000", width=90, dense=True, text_size=13,
+                        on_submit=lambda e: set_and("max_points", max(100, int(e.control.value or 4000)), full_rebuild))
+    sw_tip = ft.Switch(label="悬停提示带横轴值", value=False,
+                       on_change=lambda e: set_and("custom_tip", bool(e.control.value), full_rebuild))
+    sw_iso = ft.Switch(label="曲线数据隔离更新", value=True,
+                       on_change=lambda e: set_and("isolate", bool(e.control.value), full_rebuild))
+    controls = ft.Row([dd_data, dd_step, dd_zoom, dd_density, tf_n, sw_tip, sw_iso], spacing=12, wrap=True)
+
+    # ---------- 自动测速（P0_BENCH=1） ----------
+    async def on_probe(e: ft.LayoutSizeChangeEvent):
+        ev = st["probe_event"]
+        if ev is not None and abs(e.width - st["probe_w"]) < 0.5:
+            ev.set()
+
+    probe = ft.Container(width=1, height=1, on_size_change=on_probe, size_change_interval=1)
+
+    async def frames(t0, n=3):
+        """连续改变 1 像素控件的宽度 n 次，返回界面每次回报尺寸变化时距 t0 的毫秒数。"""
+        marks = []
+        for _ in range(n):
+            st["probe_w"] = 3 - st["probe_w"]
+            probe.width = st["probe_w"]
+            st["probe_event"] = ev = asyncio.Event()
+            probe.update()
+            try:
+                await asyncio.wait_for(ev.wait(), 10)
+            except TimeoutError:
+                break
+            marks.append(1000 * (time.perf_counter() - t0))
+        return marks + [math.nan] * (n - len(marks))
+
+    def sync_controls():
+        dd_data.value, dd_step.value = st["key"], f"{st['step']:g}"
+        dd_zoom.value, dd_density.value, tf_n.value = st["zoom_mode"], st["density"], str(st["max_points"])
+        sw_tip.value, sw_iso.value = st["custom_tip"], st["isolate"]
+
+    def zoom(factor, frac=0.4):
+        lo, hi = st["lo"], st["hi"]
+        anchor = hi - frac * (hi - lo) if st["reversed"] else lo + frac * (hi - lo)
+        st["lo"] = max(anchor - (anchor - lo) * factor, st["xmin"])
+        st["hi"] = min(anchor + (hi - anchor) * factor, st["xmax"])
+        apply_range()
+
+    def pan(fraction):
+        lo, hi = st["lo"], st["hi"]
+        shift = max(min(fraction * (hi - lo), st["xmax"] - hi), st["xmin"] - lo)
+        st["lo"], st["hi"] = lo + shift, hi + shift
+        apply_range()
+
+    class BenchAborted(Exception):
+        pass
+
+    async def bench():
+        rows, misses = [], [0]
+
+        async def measure(case, action=None):
+            t0 = time.perf_counter()
+            if action is not None:
+                action()
+            py = 1000 * (time.perf_counter() - t0)
+            f = await frames(t0)
+            rows.append({"case": case, "points": st["last"].get("total") if action else None,
+                         "python_ms": round(py, 1), "frame1_ms": round(f[0], 1), "frame3_ms": round(f[2], 1)})
+            misses[0] = misses[0] + 1 if math.isnan(f[0]) else 0
+            if misses[0] >= 3:
+                raise BenchAborted("界面连续 3 次没有回报尺寸变化")
+            await asyncio.sleep(0.15)
+
+        def configure(**kw):
+            st.update(kw)
+            sync_controls()
+
+        defaults = {"key": "xrd5", "step": 0.01, "zoom_mode": "clip", "density": "all", "max_points": 4000,
+                    "custom_tip": False, "isolate": True}
+        print("[linechart] 自动测速开始", flush=True)
+        await asyncio.sleep(1.5)
+        note = ""
+        try:
+            for _ in range(5):
+                await measure("空闲（基准）")
+            for key, step, label in [("xrd5", 0.01, "XRD 5 条 · 0.01°"), ("xrd5", 0.005, "XRD 5 条 · 0.005°"),
+                                     ("xrd1", 0.01, "XRD 1 条 · 0.01°"), ("xps", 0.01, "XPS C1s")]:
+                configure(**{**defaults, "key": key, "step": step})
+                await measure(f"{label} · 首次显示", load)
+                await asyncio.sleep(0.8)
+                for _ in range(4):
+                    await measure(f"{label} · 缩放", lambda: zoom(0.85))
+                for _ in range(4):
+                    await measure(f"{label} · 平移", lambda: pan(0.1))
+                for _ in range(4):
+                    await measure(f"{label} · 缩放", lambda: zoom(1 / 0.85))
+                first = st["series"][0][0]
+                for _ in range(2):
+                    await measure(f"{label} · 图例开关", lambda name=first: toggle(name))
+            for label, kw in [("关闭隔离更新", {"isolate": False}), ("悬停提示带横轴值", {"custom_tip": True}),
+                              ("重新筛选点 · 全部点", {"zoom_mode": "filter"}),
+                              ("重新筛选点 · 抽稀到每条 4000 点", {"zoom_mode": "filter", "density": "max"}),
+                              ("重新筛选点 · 按屏幕像素抽稀", {"zoom_mode": "filter", "density": "pixel"})]:
+                configure(**{**defaults, **kw})
+                await measure(f"XRD 5 条 · 0.01° · {label} · 首次显示", load)
+                await asyncio.sleep(0.8)
+                for _ in range(3):
+                    await measure(f"XRD 5 条 · 0.01° · {label} · 缩放", lambda: zoom(0.85))
+        except BenchAborted as exc:
+            note = f"自动测速中止：{exc}"
+            print(f"[linechart] {note}", flush=True)
+        configure(**defaults)
+        load()
+        write_bench(rows, note)
+        timing.value = note or f"自动测速完成，结果在 {RESULTS / 'linechart_bench.txt'}；现在可以手动操作"
+        page.update()
+
+    def write_bench(rows, note=""):
+        groups = {}
+        for r in rows:
+            groups.setdefault(r["case"], []).append(r)
+
+        def med(values):
+            values = [v for v in values if not math.isnan(v)]  # 去掉超时
+            return statistics.median(values) if values else math.nan
+
+        def cell(text, width, right=True):  # 中文按两个字符宽对齐
+            pad = " " * max(0, width - sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text))
+            return pad + text if right else text + pad
+
+        head = ["次数", "点数", "Python", "界面第1帧", "界面第3帧", "最慢第3帧"]
+        widths = [5, 9, 9, 11, 11, 11]
+        lines = [f"P0-1 LineChart 自动测速 · {time.strftime('%Y-%m-%d %H:%M')}",
+                 f"{platform.platform()} · Python {platform.python_version()} · flet {ft.__version__}",
+                 f"图表区域 {st['w']:.0f} × {st['h']:.0f}",
+                 "单位 ms，取中位数。“界面第 3 帧”减去“空闲（基准）”的同项，约等于界面处理这次更新所用的时间。",
+                 *([note] if note else []), "",
+                 "".join(cell(h, w) for h, w in zip(head, widths, strict=True)) + "   项目"]
+        for case, rs in groups.items():
+            pts = rs[-1]["points"]
+            values = [str(len(rs)), f"{pts:,}" if pts else "-",
+                      f"{med([r['python_ms'] for r in rs]):.0f}", f"{med([r['frame1_ms'] for r in rs]):.0f}",
+                      f"{med([r['frame3_ms'] for r in rs]):.0f}", f"{max(r['frame3_ms'] for r in rs):.0f}"]
+            lines.append("".join(cell(v, w) for v, w in zip(values, widths, strict=True)) + "   " + case)
+        text = "\n".join(lines)
+        RESULTS.mkdir(exist_ok=True)
+        (RESULTS / "linechart_bench.txt").write_text(text + "\n", encoding="utf-8")
+        (RESULTS / "linechart_bench.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(text, flush=True)
 
     plot = ft.GestureDetector(
         on_scroll=on_wheel, expand=True,
@@ -375,11 +528,13 @@ def main(page: ft.Page):
         legend,
         ft.Row([ft.Text("横轴范围", size=12), slider, range_text,
                 ft.Button("复位", icon=ft.Icons.RESTART_ALT, on_click=reset)]),
-        ft.Row([status]), ft.Row([timing, fast_note], spacing=16),
+        ft.Row([status]), ft.Row([timing, fast_note, probe], spacing=16),
         ft.Text("滚轮：以鼠标位置缩放 · 触控板左右滑动：平移 · 点击图例：隐藏 / 显示曲线", size=11,
                 color=ft.Colors.BLUE_GREY_400),
     ], expand=True, spacing=8))
     load()
+    if BENCH:
+        page.run_task(bench)
 
 
 if __name__ == "__main__":

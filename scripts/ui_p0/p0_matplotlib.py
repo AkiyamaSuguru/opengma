@@ -22,6 +22,7 @@ from pathlib import Path
 
 import flet as ft
 import flet_charts as fch  # 导入时会把 matplotlib 的后端设为 Flet 专用后端，要在 GMA 之前导入
+from matplotlib import font_manager
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _common import xps_c1s_frame  # noqa: E402
@@ -29,6 +30,15 @@ from _common import xps_c1s_frame  # noqa: E402
 from GMA import XPSPlotter  # noqa: E402
 
 COLORS = {"C-Si": "#2563EB", "C-C": "#F59E0B", "C-O": "#10B981"}
+RESULTS = Path(__file__).parent / "results"
+
+
+def resolved_font(family):
+    """matplotlib 实际用到的字体文件；找不到时 matplotlib 会换成默认字体。"""
+    try:
+        return Path(font_manager.findfont(family, fallback_to_default=False)).name
+    except ValueError:
+        return "找不到，会用默认字体代替"
 
 
 def figure_and_png(font_family, font_size):
@@ -53,7 +63,11 @@ def main(page: ft.Page):
         right.content = ft.InteractiveViewer(content=ft.Image(src=png, fit=ft.BoxFit.CONTAIN),
                                              min_scale=1, max_scale=8, expand=True)
         size = fig.get_size_inches()
-        note.value = f"图尺寸 {size[0]:.1f} × {size[1]:.1f} in · {font_family} {font_size} pt"
+        note.value = (f"图尺寸 {size[0]:.1f} × {size[1]:.1f} in · {font_family} {font_size:g} pt · "
+                      f"字体文件 {resolved_font(font_family)}")
+        RESULTS.mkdir(exist_ok=True)
+        (RESULTS / f"mpl_{font_family.replace(' ', '_')}_{font_size:g}pt.png").write_bytes(png)
+        print(f"[matplotlib] {note.value}", flush=True)
         page.update()
 
     font = ft.Dropdown(label="字体", value="Times New Roman", width=220, dense=True, text_size=13, options=[

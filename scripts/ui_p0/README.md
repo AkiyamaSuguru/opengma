@@ -11,6 +11,24 @@
 | `p0_matplotlib.py` | 出版图预览：MatplotlibChart 与导出图片的对比 | `uv run --with flet-charts==1.0.5 python scripts/ui_p0/p0_matplotlib.py` |
 | `p0_netcdf.py` | 含中文名称的项目文件能否写入并原样读回 | `uv run --with xarray --with "h5netcdf[h5py]" python scripts/ui_p0/p0_netcdf.py` |
 
+### 一次运行全部（Mac）
+
+```bash
+bash scripts/ui_p0/run_mac.sh                     # 全部
+bash scripts/ui_p0/run_mac.sh window matplotlib   # 只运行其中几项：env netcdf tests linechart window matplotlib
+```
+
+依次记录系统和显示器信息、安装依赖、运行 NetCDF 检查和单元测试，再依次打开三个窗口（关掉一个才会打开下一个）。LineChart 和换窗两个窗口打开后会先自动测速（环境变量 `P0_BENCH=1`），测完停在那里，可以继续手动操作。终端输出和测速结果都写入 `scripts/ui_p0/results/`：
+
+| 文件 | 内容 |
+| --- | --- |
+| `env.log`、`netcdf.log`、`tests.log` 等 | 每一项的终端输出 |
+| `linechart_bench.txt` / `.json` | 各组数据首次显示、缩放、平移、图例开关的用时（中位数）及原始记录 |
+| `window.txt` | 屏幕尺寸、默认窗口尺寸、换窗用时 |
+| `mpl_*.png` | 出版图对话框中导出的图片 |
+
+LineChart 自动测速中每一步记两种时间：Python 端准备数据并发出更新的用时；以及界面完成第 1、第 3 帧布局的时间（发出更新后连续改变一个 1 像素控件的宽度，等界面回报尺寸变化，第 3 帧包含了前面帧的绘制）。后者减去“空闲（基准）”，约等于界面处理这次更新的时间。
+
 ## 已经在 Linux 无头浏览器中看到的情况
 
 我在开发环境里用 Flet 的网页模式加无头 Chrome（软件渲染，比真机慢）跑过前三个脚本，`p0_netcdf.py` 直接运行：
@@ -56,4 +74,4 @@
 
 ## 怎么反馈
 
-把每个脚本窗口下方的耗时文字（或截图）和上面各项的结果发给我即可。
+把每个脚本窗口下方的耗时文字（或截图）和上面各项的结果发给我即可；用 `run_mac.sh` 运行时，`scripts/ui_p0/results/` 中的文件已经包含了耗时。

@@ -7,9 +7,15 @@ P0-2：窗口尺寸按屏幕比例、同一进程换窗、关闭工作区回到�
     uv run python scripts/ui_p0/p0_window.py
 
 要验证的内容见同目录 README.md。
+
+自动换窗：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的），启动后自动在启动器和工作区之间
+来回切换 3 次并记录用时，结果写入 results/window.txt，之后停在启动器，可以继续手动操作。
 """
 from __future__ import annotations
 
+import asyncio
+import os
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -21,13 +27,19 @@ from _common import screen_size, window_size  # noqa: E402
 
 LAUNCHER = dict(ratio_w=0.42, ratio_h=0.50, min_size=(560, 420), max_size=(960, 680))
 WORKSPACE = dict(ratio_w=0.80, ratio_h=0.85, min_size=(960, 640))
+RESULTS = Path(__file__).parent / "results"
+BENCH = os.environ.get("P0_BENCH") == "1"
+
+
+def log_line(text):
+    print(f"[window] {text}", flush=True)
 
 
 async def main(page: ft.Page):
     page.title = "P0-2 · 换窗"
     page.padding = 0
     sw, sh, source = screen_size()
-    state = {"mode": "launcher", "close_to_launcher": True}
+    state = {"mode": "launcher", "close_to_launcher": True, "swaps": []}
     is_mac = page.platform == ft.PagePlatform.MACOS
     info = ft.Text("", size=12, selectable=True)
     log = ft.Text("", size=12, color=ft.Colors.BLUE_GREY_600, selectable=True)
@@ -87,6 +99,8 @@ async def main(page: ft.Page):
         info.value = sizes_text() + f"\n当前窗口设定 {size[0]} × {size[1]}"
         log.value = f"上一次换窗用时 {dt:.0f} ms（请留意换窗时是否闪烁、位置是否居中）"
         page.update()
+        state["swaps"].append((state["mode"], dt))
+        log_line(f"换到{'工作区' if state['mode'] == 'workspace' else '启动器'}：{dt:.0f} ms，设定 {size[0]} × {size[1]}")
 
     async def to_workspace(e=None):
         state["mode"] = "workspace"
@@ -101,16 +115,45 @@ async def main(page: ft.Page):
         await page.window.destroy()
 
     async def on_window_event(e: ft.WindowEvent):
+        if e.type in (ft.WindowEventType.RESIZED, ft.WindowEventType.MOVED):
+            w = page.window
+            log_line(f"窗口事件 {e.type.value}：位置 ({w.left}, {w.top})，尺寸 {w.width} × {w.height}")
+            return
         if e.type != ft.WindowEventType.CLOSE:
             return
+        log_line(f"点了关闭按钮（当前：{'工作区' if state['mode'] == 'workspace' else '启动器'}）")
         if state["mode"] == "workspace" and state["close_to_launcher"]:
             await to_launcher()
         else:
             await close_window()
 
+    async def bench():
+        await asyncio.sleep(2)
+        for _ in range(3):
+            await to_workspace()
+            await asyncio.sleep(1.5)
+            await to_launcher()
+            await asyncio.sleep(1.5)
+        lines = [f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）",
+                 f"启动器默认 {window_size(sw, sh, **LAUNCHER)}，工作区默认 {window_size(sw, sh, **WORKSPACE)}"]
+        for mode, name in (("workspace", "进入工作区"), ("launcher", "回到启动器")):
+            times = [dt for m, dt in state["swaps"][1:] if m == mode]  # 第一次打开启动器不计
+            if times:
+                lines.append(f"{name}：{len(times)} 次，中位数 {statistics.median(times):.0f} ms，"
+                             f"最慢 {max(times):.0f} ms")
+        RESULTS.mkdir(exist_ok=True)
+        (RESULTS / "window.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        for line in lines:
+            log_line(line)
+        log.value = "自动换窗完成，现在可以手动操作。" + log.value
+        page.update()
+
     page.window.prevent_close = True
     page.window.on_event = on_window_event
+    log_line(f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）")
     await to_launcher()
+    if BENCH:
+        page.run_task(bench)
 
 
 if __name__ == "__main__":
