@@ -14,9 +14,10 @@ P0-1：Flet 原生 LineChart 的交互与流畅度验证。
 - 重新筛选点：每次缩放只发送范围内的点。
 抽稀只是可选项，打开后会自动改用“重新筛选点”，抽稀结果随缩放范围重新计算。
 
-自动测速：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的）。窗口打开后依次测量各组数据的
-首次显示、缩放、平移、图例开关，以及几种对比设置，结果写入 results/linechart_bench.txt；
-测完后窗口回到默认设置，可以继续手动操作。
+自动测速：用环境变量 P0_BENCH=1 运行（run_mac.sh 就是这样运行的），或者点窗口中的“自动测速”。
+依次测量各组数据的首次显示、缩放、平移、图例开关，以及几种对比设置，结果写入
+results/linechart_bench.txt；测完后窗口回到默认设置，可以继续手动操作。
+窗口看不见时（在别的桌面、被最小化或被完全挡住）macOS 不刷新它，测速会等它显示出来再继续。
 每一步记两种时间：Python 端（准备数据并发出更新）用时；以及界面完成第 1、第 3 帧布局的时间
 （发出更新后连续改变一个 1 像素控件的宽度，等界面回报尺寸变化，第 3 帧包含了前面的绘制）。
 """
@@ -412,11 +413,27 @@ def main(page: ft.Page):
         st["lo"], st["hi"] = lo + shift, hi + shift
         apply_range()
 
-    class BenchAborted(Exception):
-        pass
+    wait_text = "等窗口显示出来再测：窗口在别的桌面、被最小化或被完全挡住时，macOS 不刷新它"
 
-    async def bench():
-        rows, misses = [], [0]
+    async def wait_visible():
+        """等到界面重新回报尺寸变化（窗口可见、在刷新）为止。"""
+        told = False
+        while math.isnan((await frames(time.perf_counter(), n=1))[0]):
+            if not told:
+                timing.value = wait_text
+                page.update()
+                print(f"[linechart] {wait_text}", flush=True)
+                told = True
+        if told:
+            print("[linechart] 窗口已经显示，继续测速", flush=True)
+
+    async def bench(e=None):
+        if st.get("benching"):
+            return
+        st["benching"] = True
+        bench_btn.disabled = True
+        page.update()
+        rows = []
 
         async def measure(case, action=None):
             t0 = time.perf_counter()
@@ -424,11 +441,11 @@ def main(page: ft.Page):
                 action()
             py = 1000 * (time.perf_counter() - t0)
             f = await frames(t0)
-            rows.append({"case": case, "points": st["last"].get("total") if action else None,
-                         "python_ms": round(py, 1), "frame1_ms": round(f[0], 1), "frame3_ms": round(f[2], 1)})
-            misses[0] = misses[0] + 1 if math.isnan(f[0]) else 0
-            if misses[0] >= 3:
-                raise BenchAborted("界面连续 3 次没有回报尺寸变化")
+            if math.isnan(f[2]):  # 中途窗口看不见了：这一次不算，等它重新显示
+                await wait_visible()
+            else:
+                rows.append({"case": case, "points": st["last"].get("total") if action else None,
+                             "python_ms": round(py, 1), "frame1_ms": round(f[0], 1), "frame3_ms": round(f[2], 1)})
             await asyncio.sleep(0.15)
 
         def configure(**kw):
@@ -439,40 +456,38 @@ def main(page: ft.Page):
                     "custom_tip": False, "isolate": True}
         print("[linechart] 自动测速开始", flush=True)
         await asyncio.sleep(1.5)
-        note = ""
-        try:
-            for _ in range(5):
-                await measure("空闲（基准）")
-            for key, step, label in [("xrd5", 0.01, "XRD 5 条 · 0.01°"), ("xrd5", 0.005, "XRD 5 条 · 0.005°"),
-                                     ("xrd1", 0.01, "XRD 1 条 · 0.01°"), ("xps", 0.01, "XPS C1s")]:
-                configure(**{**defaults, "key": key, "step": step})
-                await measure(f"{label} · 首次显示", load)
-                await asyncio.sleep(0.8)
-                for _ in range(4):
-                    await measure(f"{label} · 缩放", lambda: zoom(0.85))
-                for _ in range(4):
-                    await measure(f"{label} · 平移", lambda: pan(0.1))
-                for _ in range(4):
-                    await measure(f"{label} · 缩放", lambda: zoom(1 / 0.85))
-                first = st["series"][0][0]
-                for _ in range(2):
-                    await measure(f"{label} · 图例开关", lambda name=first: toggle(name))
-            for label, kw in [("关闭隔离更新", {"isolate": False}), ("悬停提示带横轴值", {"custom_tip": True}),
-                              ("重新筛选点 · 全部点", {"zoom_mode": "filter"}),
-                              ("重新筛选点 · 抽稀到每条 4000 点", {"zoom_mode": "filter", "density": "max"}),
-                              ("重新筛选点 · 按屏幕像素抽稀", {"zoom_mode": "filter", "density": "pixel"})]:
-                configure(**{**defaults, **kw})
-                await measure(f"XRD 5 条 · 0.01° · {label} · 首次显示", load)
-                await asyncio.sleep(0.8)
-                for _ in range(3):
-                    await measure(f"XRD 5 条 · 0.01° · {label} · 缩放", lambda: zoom(0.85))
-        except BenchAborted as exc:
-            note = f"自动测速中止：{exc}"
-            print(f"[linechart] {note}", flush=True)
+        await wait_visible()
+        for _ in range(5):
+            await measure("空闲（基准）")
+        for key, step, label in [("xrd5", 0.01, "XRD 5 条 · 0.01°"), ("xrd5", 0.005, "XRD 5 条 · 0.005°"),
+                                 ("xrd1", 0.01, "XRD 1 条 · 0.01°"), ("xps", 0.01, "XPS C1s")]:
+            configure(**{**defaults, "key": key, "step": step})
+            await measure(f"{label} · 首次显示", load)
+            await asyncio.sleep(0.8)
+            for _ in range(4):
+                await measure(f"{label} · 缩放", lambda: zoom(0.85))
+            for _ in range(4):
+                await measure(f"{label} · 平移", lambda: pan(0.1))
+            for _ in range(4):
+                await measure(f"{label} · 缩放", lambda: zoom(1 / 0.85))
+            first = st["series"][0][0]
+            for _ in range(2):
+                await measure(f"{label} · 图例开关", lambda name=first: toggle(name))
+        for label, kw in [("关闭隔离更新", {"isolate": False}), ("悬停提示带横轴值", {"custom_tip": True}),
+                          ("重新筛选点 · 全部点", {"zoom_mode": "filter"}),
+                          ("重新筛选点 · 抽稀到每条 4000 点", {"zoom_mode": "filter", "density": "max"}),
+                          ("重新筛选点 · 按屏幕像素抽稀", {"zoom_mode": "filter", "density": "pixel"})]:
+            configure(**{**defaults, **kw})
+            await measure(f"XRD 5 条 · 0.01° · {label} · 首次显示", load)
+            await asyncio.sleep(0.8)
+            for _ in range(3):
+                await measure(f"XRD 5 条 · 0.01° · {label} · 缩放", lambda: zoom(0.85))
         configure(**defaults)
         load()
-        write_bench(rows, note)
-        timing.value = note or f"自动测速完成，结果在 {RESULTS / 'linechart_bench.txt'}；现在可以手动操作"
+        write_bench(rows)
+        timing.value = f"自动测速完成，结果在 {RESULTS / 'linechart_bench.txt'}；现在可以手动操作"
+        st["benching"] = False
+        bench_btn.disabled = False
         page.update()
 
     def write_bench(rows, note=""):
@@ -508,6 +523,7 @@ def main(page: ft.Page):
         (RESULTS / "linechart_bench.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
         print(text, flush=True)
 
+    bench_btn = ft.Button("自动测速", icon=ft.Icons.SPEED, on_click=bench, tooltip="依次测量各组数据和设置，约 1–3 分钟")
     plot = ft.GestureDetector(
         on_scroll=on_wheel, expand=True,
         content=ft.Container(content=ft.Stack([grid_layer, chart_holder], expand=True),
@@ -527,7 +543,7 @@ def main(page: ft.Page):
                      border=ft.Border.all(1, "#D5E1E4"), padding=ft.Padding.only(left=4, right=16, top=12, bottom=6)),
         legend,
         ft.Row([ft.Text("横轴范围", size=12), slider, range_text,
-                ft.Button("复位", icon=ft.Icons.RESTART_ALT, on_click=reset)]),
+                ft.Button("复位", icon=ft.Icons.RESTART_ALT, on_click=reset), bench_btn]),
         ft.Row([status]), ft.Row([timing, fast_note, probe], spacing=16),
         ft.Text("滚轮：以鼠标位置缩放 · 触控板左右滑动：平移 · 点击图例：隐藏 / 显示曲线", size=11,
                 color=ft.Colors.BLUE_GREY_400),
