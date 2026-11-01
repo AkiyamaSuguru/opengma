@@ -7,6 +7,7 @@ license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
+    "flet>=1.0.5",
     "marimo>=0.23.16",
     "matplotlib>=3.11.2",
     "openpyxl>=3.1.5",
@@ -32,5 +33,9 @@ filterwarnings = ["ignore:The default engine for reading 'xlsx' files:Deprecatio
 
 [dependency-groups]
 dev = [
+    "flet-cli>=1.0.5",
+    "flet-desktop>=1.0.5",
+    "flet-web>=1.0.5",
+    "flet[test]>=1.0.5",
     "pytest>=9.2.0",
 ]
