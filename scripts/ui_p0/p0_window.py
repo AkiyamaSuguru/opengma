@@ -88,10 +88,24 @@ async def main(page: ft.Page):
         ], spacing=12))
 
     # ---------- 换窗 ----------
-    async def show(view, title_bar_hidden, size, min_size, resizable=True):
+    async def show(view, title_bar_hidden, size, min_size, resizable=True, how="opacity"):
+        """
+        换窗：先让窗口看不见，换内容、尺寸、标题栏，居中后再显示。
+        how="opacity" 把窗口透明度设为 0（窗口仍在）；how="hide" 隐藏窗口。
+        第一轮在 Mac 上窗口一启动就关掉了，怀疑与隐藏窗口有关，所以每一步都记一行。
+        """
         t0 = time.perf_counter()
-        page.window.visible = False
+        name = "工作区" if state["mode"] == "workspace" else "启动器"
+
+        def mark(text):
+            log_line(f"  {name}·{how}：{text}（{1000 * (time.perf_counter() - t0):.0f} ms）")
+
+        if how == "hide":
+            page.window.visible = False
+        else:
+            page.window.opacity = 0
         page.update()
+        mark("已隐藏")
         page.window.title_bar_hidden = title_bar_hidden
         page.window.title_bar_buttons_hidden = False
         page.window.min_width, page.window.min_height = min_size
@@ -99,24 +113,29 @@ async def main(page: ft.Page):
         page.window.resizable = resizable
         page.controls.clear()
         page.add(view)
+        mark("已换内容和尺寸")
         await page.window.center()
-        page.window.visible = True
+        mark("已居中")
+        if how == "hide":
+            page.window.visible = True
+        else:
+            page.window.opacity = 1
         page.update()
         await bring_to_front(page)
         dt = (time.perf_counter() - t0) * 1000
         info.value = sizes_text() + f"\n当前窗口设定 {size[0]} × {size[1]}"
         log.value = f"上一次换窗用时 {dt:.0f} ms（请留意换窗时是否闪烁、位置是否居中）"
         page.update()
-        state["swaps"].append((state["mode"], dt))
-        log_line(f"换到{'工作区' if state['mode'] == 'workspace' else '启动器'}：{dt:.0f} ms，设定 {size[0]} × {size[1]}")
+        state["swaps"].append((state["mode"], how, dt))
+        log_line(f"换到{name}（{how}）：{dt:.0f} ms，设定 {size[0]} × {size[1]}")
 
-    async def to_workspace(e=None):
+    async def to_workspace(e=None, how="opacity"):
         state["mode"] = "workspace"
-        await show(workspace_view(), False, window_size(sw, sh, **WORKSPACE), WORKSPACE["min_size"])
+        await show(workspace_view(), False, window_size(sw, sh, **WORKSPACE), WORKSPACE["min_size"], how=how)
 
-    async def to_launcher(e=None):
+    async def to_launcher(e=None, how="opacity"):
         state["mode"] = "launcher"
-        await show(launcher_view(), True, window_size(sw, sh, **LAUNCHER), LAUNCHER["min_size"])
+        await show(launcher_view(), True, window_size(sw, sh, **LAUNCHER), LAUNCHER["min_size"], how=how)
 
     async def close_window(e=None):
         page.window.prevent_close = False
@@ -145,14 +164,22 @@ async def main(page: ft.Page):
         lines = [f"屏幕 {sw:.0f} × {sh:.0f}（来源：{source}）",
                  f"启动器默认 {window_size(sw, sh, **LAUNCHER)}，工作区默认 {window_size(sw, sh, **WORKSPACE)}"]
         for mode, name in (("workspace", "进入工作区"), ("launcher", "回到启动器")):
-            times = [dt for m, dt in state["swaps"][1:] if m == mode]  # 第一次打开启动器不计
+            times = [dt for m, how, dt in state["swaps"][1:] if m == mode and how == "opacity"]  # 第一次打开不计
             if times:
-                lines.append(f"{name}：{len(times)} 次，中位数 {statistics.median(times):.0f} ms，"
+                lines.append(f"{name}（透明度方式）：{len(times)} 次，中位数 {statistics.median(times):.0f} ms，"
                              f"最慢 {max(times):.0f} ms")
         RESULTS.mkdir(exist_ok=True)
         (RESULTS / "window.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
         for line in lines:
             log_line(line)
+        # 最后单独试一次“隐藏窗口”的换窗方式，看它是不是让窗口关掉的原因
+        log_line("开始测试隐藏窗口的换窗方式")
+        await to_workspace(how="hide")
+        await asyncio.sleep(1.5)
+        await to_launcher(how="hide")
+        log_line("隐藏窗口的换窗方式正常")
+        with (RESULTS / "window.txt").open("a", encoding="utf-8") as f:
+            f.write("隐藏窗口的换窗方式也正常\n")
         log.value = "自动换窗完成，现在可以手动操作。" + log.value
         page.update()
 

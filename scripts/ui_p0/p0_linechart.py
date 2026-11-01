@@ -291,6 +291,7 @@ def main(page: ft.Page):
         st["last_wheel"] = now
         dx = e.scroll_delta.x if e.scroll_delta else 0
         dy = e.scroll_delta.y if e.scroll_delta else 0
+        log_input("scroll", f"dx={dx:.1f} dy={dy:.1f}")
         lo, hi = st["lo"], st["hi"]
         span = hi - lo
         if abs(dx) > abs(dy):  # 触控板左右滑动：平移
@@ -305,6 +306,52 @@ def main(page: ft.Page):
             st["hi"] = min(anchor + (hi - anchor) * factor, st["xmax"])
         else:
             return
+        apply_range()
+
+    input_logged = {"scroll": 0, "scale": 0}
+
+    def log_input(kind, text):
+        if input_logged[kind] < 8:  # 只记前几次，看 macOS 送来的是哪种事件
+            input_logged[kind] += 1
+            print(f"[linechart] 输入 {kind}：{text}", flush=True)
+
+    def on_scale_start(e: ft.ScaleStartEvent):
+        st["pinch"] = 1.0
+        log_input("scale", f"开始，手指 {e.pointer_count}")
+
+    def on_scale_update(e: ft.ScaleUpdateEvent):
+        dx, dy = e.focal_point_delta.x, e.focal_point_delta.y
+        log_input("scale", f"scale={e.scale:.3f} 手指={e.pointer_count} 位移=({dx:.1f}, {dy:.1f})")
+        if e.pointer_count < 2:  # 鼠标拖动不处理，留给图表自己的悬停
+            return
+        st["acc_dx"] = st.get("acc_dx", 0.0) + dx
+        st["acc_dy"] = st.get("acc_dy", 0.0) + dy
+        zoom_by = st.get("pinch", 1.0) / e.scale if e.scale > 0 else 1.0
+        st["pinch"] = e.scale
+        st["acc_zoom"] = st.get("acc_zoom", 1.0) * zoom_by
+        now = time.perf_counter()
+        if now - st["last_wheel"] < (0.04 if fast_mode() else 0.12):
+            return
+        st["last_wheel"] = now
+        lo, hi = st["lo"], st["hi"]
+        span = hi - lo
+        frac = min(max(e.local_focal_point.x / st["w"], 0), 1)
+        anchor = hi - frac * span if st["reversed"] else lo + frac * span
+        factor = st["acc_zoom"]
+        if abs(st["acc_dy"]) > abs(st["acc_dx"]):  # 双指上下滑：和滚轮一样缩放
+            factor *= math.exp(st["acc_dy"] / 300)
+        else:  # 双指左右滑：平移（内容跟着手指走），到头就停
+            shift = -st["acc_dx"] / st["w"] * span * (-1 if st["reversed"] else 1)
+            shift = max(min(shift, st["xmax"] - hi), st["xmin"] - lo)
+            anchor += shift
+            lo, hi = lo + shift, hi + shift
+        st["acc_dx"] = st["acc_dy"] = 0.0
+        st["acc_zoom"] = 1.0
+        new_lo = anchor - (anchor - lo) * factor
+        new_hi = anchor + (hi - anchor) * factor
+        if new_hi - new_lo < 1e-6:
+            return
+        st["lo"], st["hi"] = max(new_lo, st["xmin"]), min(new_hi, st["xmax"])
         apply_range()
 
     def on_slider_end(e):
@@ -380,23 +427,49 @@ def main(page: ft.Page):
     controls = ft.Row([dd_data, dd_step, dd_zoom, dd_density, tf_n, sw_tip, sw_iso], spacing=12, wrap=True)
 
     # ---------- 自动测速（P0_BENCH=1） ----------
-    async def on_probe(e: ft.LayoutSizeChangeEvent):
-        ev = st["probe_event"]
-        if ev is not None and abs(e.width - st["probe_w"]) < 0.5:
-            ev.set()
+    # 用“探针”判断界面什么时候处理完一次更新：改变几个 1 像素控件的宽度（在 1、2、3 之间轮换，
+    # 迟到的回报对不上当前宽度，不会被误认），等界面回报。哪种先回应就用哪种，并统计各自回应了多少次：
+    #   size0：尺寸变化立即回报（size_change_interval=0）
+    #   size10：用默认的 10 ms 采样（图表区域的尺寸回报在 Mac 上正常，用的就是默认值）
+    #   anim：带 1 ms 隐式动画，动画结束时回报。这个事件不带宽度，只计数，不用来计时
+    # 处理函数写成普通函数，用 call_soon_threadsafe 通知等待中的协程。
+    probe_stats = {"size0": 0, "size10": 0, "anim": 0}
+    probe_logged = dict.fromkeys(probe_stats, 0)
 
-    probe = ft.Container(width=1, height=1, on_size_change=on_probe, size_change_interval=1)
+    def probe_hit(kind, width=None):
+        if probe_logged[kind] < 3:
+            probe_logged[kind] += 1
+            print(f"[linechart] 探针 {kind} 回报：宽 {width}，应为 {st['probe_w']}", flush=True)
+        ev, loop = st["probe_event"], st.get("loop")
+        if width is None:  # 动画结束：只计数
+            probe_stats[kind] += 1
+            return
+        if ev is not None and loop is not None and abs(width - st["probe_w"]) < 0.5:
+            probe_stats[kind] += 1
+            loop.call_soon_threadsafe(ev.set)
 
-    async def frames(t0, n=3):
-        """连续改变 1 像素控件的宽度 n 次，返回界面每次回报尺寸变化时距 t0 的毫秒数。"""
+    probes = [
+        ft.Container(width=1, height=1, size_change_interval=0,
+                     on_size_change=lambda e: probe_hit("size0", e.width)),
+        ft.Container(width=1, height=1, on_size_change=lambda e: probe_hit("size10", e.width)),
+        ft.Container(width=1, height=1, animate=ft.Animation(1), on_animation_end=lambda e: probe_hit("anim")),
+    ]
+    probe_row = ft.Row(probes, spacing=1, tight=True)
+
+    async def frames(t0, n=3, timeout=10):
+        """连续改变探针的宽度 n 次，返回界面每次回应时距 t0 的毫秒数；没有回应的记为 NaN。"""
+        if st.get("no_probe"):
+            return [math.nan] * n
+        st["loop"] = asyncio.get_running_loop()
         marks = []
         for _ in range(n):
-            st["probe_w"] = 3 - st["probe_w"]
-            probe.width = st["probe_w"]
+            st["probe_w"] = st["probe_w"] % 3 + 1
+            for p in probes:
+                p.width = st["probe_w"]
             st["probe_event"] = ev = asyncio.Event()
-            probe.update()
+            probe_row.update()
             try:
-                await asyncio.wait_for(ev.wait(), 10)
+                await asyncio.wait_for(ev.wait(), timeout)
             except TimeoutError:
                 break
             marks.append(1000 * (time.perf_counter() - t0))
@@ -420,11 +493,14 @@ def main(page: ft.Page):
         st["lo"], st["hi"] = lo + shift, hi + shift
         apply_range()
 
-    wait_text = "等窗口显示出来再测：窗口在别的桌面、被最小化或被完全挡住时，macOS 不刷新它"
+    wait_text = "等界面回应：窗口在别的桌面、被最小化或被完全挡住时，macOS 不刷新它"
 
-    async def wait_visible():
-        """等到界面重新回报尺寸变化（窗口可见、在刷新）为止。"""
-        told = False
+    async def wait_visible(limit=60):
+        """
+        等到界面重新回应探针（窗口可见、在刷新）为止。等了 limit 秒还没有回应时，
+        不再测界面用时，只记 Python 端用时，免得一直卡在这里。
+        """
+        told, start = False, time.perf_counter()
         while math.isnan((await frames(time.perf_counter(), n=1))[0]):
             await bring_to_front(page)
             if not told:
@@ -432,8 +508,15 @@ def main(page: ft.Page):
                 page.update()
                 print(f"[linechart] {wait_text}", flush=True)
                 told = True
+            if time.perf_counter() - start > limit:
+                st["no_probe"] = True
+                text = f"界面 {limit} 秒没有回应探针，改为只记 Python 端用时（各探针回应次数：{probe_stats}）"
+                timing.value = text
+                page.update()
+                print(f"[linechart] {text}", flush=True)
+                return
         if told:
-            print("[linechart] 窗口已经显示，继续测速", flush=True)
+            print("[linechart] 界面有回应了，继续测速", flush=True)
 
     async def bench(e=None):
         if st.get("benching"):
@@ -451,11 +534,13 @@ def main(page: ft.Page):
                 action()
             py = 1000 * (time.perf_counter() - t0)
             f = await frames(t0)
-            if math.isnan(f[2]):  # 中途窗口看不见了：这一次不算，等它重新显示
+            if math.isnan(f[2]) and not st.get("no_probe"):  # 中途窗口看不见了：等它重新显示
                 await wait_visible()
-            else:
-                rows.append({"case": case, "points": st["last"].get("total") if action else None,
-                             "python_ms": round(py, 1), "frame1_ms": round(f[0], 1), "frame3_ms": round(f[2], 1)})
+                if not st.get("no_probe"):  # 窗口回来了，这一次不算
+                    await asyncio.sleep(0.15)
+                    return
+            rows.append({"case": case, "points": st["last"].get("total") if action else None,
+                         "python_ms": round(py, 1), "frame1_ms": round(f[0], 1), "frame3_ms": round(f[2], 1)})
             await asyncio.sleep(0.15)
 
         def configure(**kw):
@@ -506,6 +591,9 @@ def main(page: ft.Page):
         for r in rows:
             groups.setdefault(r["case"], []).append(r)
 
+        def ms(v):
+            return "-" if math.isnan(v) else f"{v:.0f}"
+
         def med(values):
             values = [v for v in values if not math.isnan(v)]  # 去掉超时
             return statistics.median(values) if values else math.nan
@@ -520,13 +608,15 @@ def main(page: ft.Page):
                  f"{platform.platform()} · Python {platform.python_version()} · flet {ft.__version__}",
                  f"图表区域 {st['w']:.0f} × {st['h']:.0f}",
                  "单位 ms，取中位数。“界面第 3 帧”减去“空闲（基准）”的同项，约等于界面处理这次更新所用的时间。",
+                 f"各探针回应次数：{probe_stats}" + ("（探针没有回应，只记了 Python 端用时）" if st.get("no_probe") else ""),
                  *([note] if note else []), "",
                  "".join(cell(h, w) for h, w in zip(head, widths, strict=True)) + "   项目"]
         for case, rs in groups.items():
             pts = rs[-1]["points"]
-            values = [str(len(rs)), f"{pts:,}" if pts else "-",
-                      f"{med([r['python_ms'] for r in rs]):.0f}", f"{med([r['frame1_ms'] for r in rs]):.0f}",
-                      f"{med([r['frame3_ms'] for r in rs]):.0f}", f"{max(r['frame3_ms'] for r in rs):.0f}"]
+            slowest = [r["frame3_ms"] for r in rs if not math.isnan(r["frame3_ms"])]
+            values = [str(len(rs)), f"{pts:,}" if pts else "-", ms(med([r["python_ms"] for r in rs])),
+                      ms(med([r["frame1_ms"] for r in rs])), ms(med([r["frame3_ms"] for r in rs])),
+                      ms(max(slowest) if slowest else math.nan)]
             lines.append("".join(cell(v, w) for v, w in zip(values, widths, strict=True)) + "   " + case)
         text = "\n".join(lines)
         RESULTS.mkdir(exist_ok=True)
@@ -536,7 +626,7 @@ def main(page: ft.Page):
 
     bench_btn = ft.Button("自动测速", icon=ft.Icons.SPEED, on_click=bench, tooltip="依次测量各组数据和设置，约 1–3 分钟")
     plot = ft.GestureDetector(
-        on_scroll=on_wheel, expand=True,
+        on_scroll=on_wheel, on_scale_start=on_scale_start, on_scale_update=on_scale_update, expand=True,
         content=ft.Container(content=ft.Stack([grid_layer, chart_holder], expand=True),
                              clip_behavior=ft.ClipBehavior.HARD_EDGE, expand=True, bgcolor=ft.Colors.WHITE,
                              border=ft.Border.all(1, "#CAD9DD"), on_size_change=on_plot_size))
@@ -555,8 +645,8 @@ def main(page: ft.Page):
         legend,
         ft.Row([ft.Text("横轴范围", size=12), slider, range_text,
                 ft.Button("复位", icon=ft.Icons.RESTART_ALT, on_click=reset), bench_btn]),
-        ft.Row([status]), ft.Row([timing, fast_note, probe], spacing=16),
-        ft.Text("滚轮：以鼠标位置缩放 · 触控板左右滑动：平移 · 点击图例：隐藏 / 显示曲线", size=11,
+        ft.Row([status]), ft.Row([timing, fast_note, probe_row], spacing=16),
+        ft.Text("滚轮或双指上下滑：以指针位置缩放 · 捏合：缩放 · 双指左右滑：平移 · 点击图例：隐藏 / 显示曲线", size=11,
                 color=ft.Colors.BLUE_GREY_400),
     ], expand=True, spacing=8))
     load()
