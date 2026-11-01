@@ -174,6 +174,13 @@ def test_palette():
     assert theme.mix("#000000", "#FFFFFF", 0.5) == "#808080"
 
 
+def test_bundled_font():
+    """界面字体随应用附带（SIL OFL 1.1），许可证文件在同一文件夹中。"""
+    assert theme.available_font() == theme.UI_FONT
+    assert theme.font_files() == {theme.UI_FONT: "fonts/NotoSansSC-Regular.otf"}
+    assert (theme.FONT_DIR / "OFL.txt").is_file()
+
+
 @pytest.mark.parametrize(("area", "ratio", "limits", "expected"), [
     ((1470, 937), (0.42, 0.52), ((560, 420), (960, 700)), (617, 487)),
     ((1470, 937), (0.85, 0.90), ((960, 640), None), (1250, 843)),
