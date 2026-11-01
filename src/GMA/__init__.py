@@ -4,11 +4,12 @@
 OPEN GMA（Open General Material Analyzer）：材料表征数据的读取、分析与绘图。
 
 常用入口：
-    from GMA import XPSLoader, XPSPlotter, RamanLoader, RamanPlotter, XRDLoader, XRDPlotter
+    from GMA import XPSLoader, XPSAnalyzer, XPSPlotter, RamanLoader, RamanPlotter, XRDLoader, XRDPlotter
 """
 from .CM import (
     RamanLoader,
     RamanPlotter,
+    XPSAnalyzer,
     XPSLoader,
     XPSPlotter,
     XRDLoader,
@@ -18,6 +19,7 @@ from .CM import (
 __all__ = [
     "RamanLoader",
     "RamanPlotter",
+    "XPSAnalyzer",
     "XPSLoader",
     "XPSPlotter",
     "XRDLoader",

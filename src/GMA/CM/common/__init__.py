@@ -10,6 +10,7 @@ CM 中各表征方法共用的部分，XPS、Raman、XRD 的读取和绘图都�
 - style：出版图样式和交互图布局
 - spectra_static / spectra_interactive：谱线图（单条 / 同一张图 / 子图）
 - fit_static / fit_interactive：拟合谱（分峰）图
+- metrics：谱图的数值指标（数据范围、拟合质量、分峰峰位 / 峰高 / 面积）
 - plotter：各表征方法 Plotter 的基类 BasePlotter
 """
 from .axis import SpectrumAxis
