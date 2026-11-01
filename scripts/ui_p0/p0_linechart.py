@@ -24,6 +24,7 @@ results/linechart_bench.txt；测完后窗口回到默认设置，可以继续�
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import math
 import os
@@ -49,6 +50,12 @@ GRID, LABEL = "#E7EEF0", "#50656B"
 TRANSPARENT = "#00000000"
 RESULTS = Path(__file__).parent / "results"
 BENCH = os.environ.get("P0_BENCH") == "1"
+
+
+async def bring_to_front(page):
+    """把窗口拿到最前面；网页模式等不支持时忽略。"""
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(page.window.to_front(), 3)
 
 
 class IsolatedSeries(fch.LineChartData):
@@ -419,6 +426,7 @@ def main(page: ft.Page):
         """等到界面重新回报尺寸变化（窗口可见、在刷新）为止。"""
         told = False
         while math.isnan((await frames(time.perf_counter(), n=1))[0]):
+            await bring_to_front(page)
             if not told:
                 timing.value = wait_text
                 page.update()
@@ -432,7 +440,9 @@ def main(page: ft.Page):
             return
         st["benching"] = True
         bench_btn.disabled = True
+        page.window.always_on_top = True  # 测速时置顶：被别的窗口挡住时 macOS 不刷新
         page.update()
+        await bring_to_front(page)
         rows = []
 
         async def measure(case, action=None):
@@ -488,6 +498,7 @@ def main(page: ft.Page):
         timing.value = f"自动测速完成，结果在 {RESULTS / 'linechart_bench.txt'}；现在可以手动操作"
         st["benching"] = False
         bench_btn.disabled = False
+        page.window.always_on_top = False
         page.update()
 
     def write_bench(rows, note=""):
@@ -554,4 +565,8 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.run(main)
+    try:
+        ft.run(main)
+        print("[linechart] 窗口已关闭", flush=True)
+    except KeyboardInterrupt:
+        print("[linechart] 被 Ctrl+C 中断", flush=True)

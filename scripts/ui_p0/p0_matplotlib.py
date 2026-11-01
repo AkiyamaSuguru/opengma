@@ -16,6 +16,8 @@ P0-3：出版图预览的两种做法对比。
 """
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import io
 import sys
 from pathlib import Path
@@ -31,6 +33,12 @@ from GMA import XPSPlotter  # noqa: E402
 
 COLORS = {"C-Si": "#2563EB", "C-C": "#F59E0B", "C-O": "#10B981"}
 RESULTS = Path(__file__).parent / "results"
+
+
+async def bring_to_front(page):
+    """把窗口拿到最前面；网页模式等不支持时忽略。"""
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(page.window.to_front(), 3)
 
 
 def resolved_font(family):
@@ -86,7 +94,12 @@ def main(page: ft.Page):
         ], expand=True, spacing=16),
     ], expand=True))
     render()
+    page.run_task(bring_to_front, page)
 
 
 if __name__ == "__main__":
-    ft.run(main)
+    try:
+        ft.run(main)
+        print("[matplotlib] 窗口已关闭", flush=True)
+    except KeyboardInterrupt:
+        print("[matplotlib] 被 Ctrl+C 中断", flush=True)

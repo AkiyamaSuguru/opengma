@@ -14,6 +14,7 @@ P0-2：窗口尺寸按屏幕比例、同一进程换窗、关闭工作区回到�
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import statistics
 import sys
@@ -29,6 +30,12 @@ LAUNCHER = dict(ratio_w=0.42, ratio_h=0.50, min_size=(560, 420), max_size=(960, 
 WORKSPACE = dict(ratio_w=0.80, ratio_h=0.85, min_size=(960, 640))
 RESULTS = Path(__file__).parent / "results"
 BENCH = os.environ.get("P0_BENCH") == "1"
+
+
+async def bring_to_front(page):
+    """把窗口拿到最前面；网页模式等不支持时忽略。"""
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(page.window.to_front(), 3)
 
 
 def log_line(text):
@@ -95,6 +102,7 @@ async def main(page: ft.Page):
         await page.window.center()
         page.window.visible = True
         page.update()
+        await bring_to_front(page)
         dt = (time.perf_counter() - t0) * 1000
         info.value = sizes_text() + f"\n当前窗口设定 {size[0]} × {size[1]}"
         log.value = f"上一次换窗用时 {dt:.0f} ms（请留意换窗时是否闪烁、位置是否居中）"
@@ -157,4 +165,8 @@ async def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.run(main)
+    try:
+        ft.run(main)
+        log_line("窗口已关闭")
+    except KeyboardInterrupt:
+        log_line("被 Ctrl+C 中断")

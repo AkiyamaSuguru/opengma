@@ -17,6 +17,7 @@ OUT="scripts/ui_p0/results"
 mkdir -p "$OUT"
 export PYTHONUNBUFFERED=1
 CHARTS="--with flet-charts==1.0.5"
+trap 'echo; echo "已停止（Ctrl+C）。"; exit 130' INT
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "没有找到 uv。安装：brew install uv，或者 curl -LsSf https://astral.sh/uv/install.sh | sh"
