@@ -41,6 +41,10 @@ src/GMA/
 │   ├── Raman/               # 结构同上：RamanLoader、RamanPlotter、RLoader/、RPlotter/
 │   └── XRD/                 # 结构同上：XRDLoader、XRDPlotter、DLoader/、DPlotter/
 ├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
+├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置
+│   ├── views/               # 工作区中的页面：项目总览、各模块页，以及模块注册表
+│   ├── components/          # 对话框和通用小部件
+│   └── assets/              # 图标（以及可选的界面字体）
 └── utils/
 tests/                       # 测试
 ```
@@ -61,6 +65,28 @@ uv sync
 
 ```bash
 uv run pytest
+```
+
+## 图形界面
+
+图形界面基于 [Flet](https://flet.dev/)，Windows、macOS、Linux 使用同一套代码。安装后运行：
+
+```bash
+uv run opengma            # 或者 uv run python -m GMA.UI
+```
+
+启动后先显示启动器：点击模块卡片新建项目，或者打开最近的项目。工作区按标签组织，固定在最左边的“项目”标签是项目总览，包括样品表（样品信息的字段由你定义，单击单元格编辑）、数据检查（导入时的清洗记录、各样品分峰名不一致）和导出（Excel / CSV）。各模块的页面（导入、谱图、分峰、出版图）正在开发中。
+
+- 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、窗口大小和最近项目。
+- 项目文件会保存界面状态（打开了哪些模块、停留在哪个标签），再次打开时恢复。
+- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+, 设置；macOS 上也可以用 ⌘。
+- Linux 上的文件对话框需要系统中装有 `zenity`。
+- 界面字体：把 Noto Sans SC 的字体文件（如 `NotoSansSC-Regular.otf`）放进 `src/GMA/UI/assets/fonts/`，界面会使用它，各系统上的显示更一致；没有时使用系统字体。
+
+想先看看界面，可以生成一个演示项目，再在启动器中用“打开项目…”打开它：
+
+```bash
+uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项目.nc（模拟数据）
 ```
 
 ## 快速上手

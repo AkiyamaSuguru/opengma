@@ -444,10 +444,16 @@ class Project:
             self.set_sample_info(name, key, value)
         return sample
 
-    def set_sample_info(self, sample: str, field_name: str, value) -> None:
+    def add_field(self, field_name: str) -> str:
+        """添加一个样品信息字段（各样品的值先留空）；已有同名字段时不重复添加。"""
         field_name = _check_name(field_name, "field")
         if field_name not in self.sample_fields:
             self.sample_fields.append(field_name)
+            self.dirty = True
+        return field_name
+
+    def set_sample_info(self, sample: str, field_name: str, value) -> None:
+        field_name = self.add_field(field_name)
         self.add_sample(sample).info[field_name] = "" if value is None else str(value)
         self.dirty = True
 
