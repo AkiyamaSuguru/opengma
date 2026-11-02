@@ -1,7 +1,7 @@
 [project]
 name = "opengma"
 version = "0.1.0"
-description = "Open General Material Analyzer: read, analyze and plot materials characterization data (XPS, Raman, XRD)."
+description = "Open General Material Analyzer: read, analyze and plot materials characterization data (XPS, Raman, XRD), with SRIM and molten-salt calculations, NetCDF project files and a desktop GUI."
 readme = "README.md"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
