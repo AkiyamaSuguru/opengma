@@ -312,7 +312,7 @@ class PeakTablesDialog(_TableDialog):
                     self.current = name
                     self.show_rows(rows)
                     self.refresh_top()
-                self.say(f"{name}：{problem(exc)}")
+                self.say(S.LABELED.format(label=name, value=problem(exc)))
                 return
         project = self.view.project
         if checked != project.peak_tables:

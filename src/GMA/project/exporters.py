@@ -18,6 +18,13 @@ INVALID_SHEET = re.compile(r"[\[\]:*?/\\]")
 INVALID_FILE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 MAX_SHEET = 31  # Excel 工作表名的长度上限
 INFO_SHEET = "信息"
+# “信息”表的表名和列名、多个分峰名和清洗记录之间的分隔；界面用英文时传入 labels 替换
+INFO_LABELS = {
+    "info_sheet": INFO_SHEET, "sheet": "工作表", "sample": "样品", "method": "方法", "kind": "类型", "name": "名称",
+    "points": "点数", "components": "分峰", "component_mode": "分峰数据模式", "source": "来源文件",
+    "sha256": "SHA-256", "reader": "读取器", "imported_at": "导入时间", "gma_version": "GMA 版本",
+    "clean_notes": "清洗记录", "notes": "备注", "list_sep": "、", "note_sep": "；",
+}
 
 
 def safe_filename(name: str) -> str:
@@ -25,11 +32,11 @@ def safe_filename(name: str) -> str:
     return text or "_"
 
 
-def sheet_name(base: str, used: set[str]) -> str:
-    """生成合法且不重复的工作表名：去掉 []:*?/\\，长度不超过 31。"""
+def sheet_name(base: str, used: set[str], reserved: str = INFO_SHEET) -> str:
+    """生成合法且不重复的工作表名：去掉 []:*?/\\，长度不超过 31，不与“信息”表（reserved）重名。"""
     clean = INVALID_SHEET.sub("_", str(base)).strip("'") or "Sheet"
     name, i = clean[:MAX_SHEET], 2
-    while name.casefold() in used or name == INFO_SHEET:
+    while name.casefold() in used or name == reserved:
         suffix = f" ({i})"
         name = clean[: MAX_SHEET - len(suffix)] + suffix
         i += 1
@@ -37,21 +44,27 @@ def sheet_name(base: str, used: set[str]) -> str:
     return name
 
 
-def info_frame(records, project: Project | None = None, sheets: list[str] | None = None) -> pd.DataFrame:
-    """每条谱图一行：工作表名、样品、方法、类型、名称、来源、清洗记录，以及样品信息字段。"""
+def info_frame(records, project: Project | None = None, sheets: list[str] | None = None, *,
+               labels: dict | None = None, note_text=None) -> pd.DataFrame:
+    """
+    每条谱图一行：工作表名、样品、方法、类型、名称、来源、清洗记录，以及样品信息字段。
+    labels 替换 INFO_LABELS 中的列名（如英文界面）；note_text(note) 给出清洗记录的说明，默认为 note.text()。
+    """
+    lab = {**INFO_LABELS, **(labels or {})}
+    note_text = note_text or (lambda note: note.text())
     fields = list(project.sample_fields) if project is not None else []
     rows = []
     for i, r in enumerate(records):
         src = r.source
         row = {
-            "工作表": sheets[i] if sheets else "",
-            "样品": r.sample, "方法": r.method, "类型": r.kind, "名称": r.name,
-            "点数": r.point_count, "分峰": "、".join(r.components),
-            "分峰数据模式": r.component_mode if r.fitted else "",
-            "来源文件": src["path"], "SHA-256": src["sha256"], "读取器": src["reader"],
-            "导入时间": src["imported_at"], "GMA 版本": src["gma_version"],
-            "清洗记录": "；".join(n.text() for n in r.clean_notes),
-            "备注": r.notes,
+            lab["sheet"]: sheets[i] if sheets else "",
+            lab["sample"]: r.sample, lab["method"]: r.method, lab["kind"]: r.kind, lab["name"]: r.name,
+            lab["points"]: r.point_count, lab["components"]: lab["list_sep"].join(r.components),
+            lab["component_mode"]: r.component_mode if r.fitted else "",
+            lab["source"]: src["path"], lab["sha256"]: src["sha256"], lab["reader"]: src["reader"],
+            lab["imported_at"]: src["imported_at"], lab["gma_version"]: src["gma_version"],
+            lab["clean_notes"]: lab["note_sep"].join(note_text(n) for n in r.clean_notes),
+            lab["notes"]: r.notes,
         }
         if project is not None and r.sample in project.samples:
             info = project.samples[r.sample].info
@@ -59,7 +72,7 @@ def info_frame(records, project: Project | None = None, sheets: list[str] | None
         rows.append(row)
     if not sheets:
         for row in rows:
-            row.pop("工作表")
+            row.pop(lab["sheet"])
     return pd.DataFrame(rows)
 
 
@@ -85,11 +98,13 @@ def export_csv(records, folder, *, include_components: bool = True) -> list[Path
 
 
 def export_excel(records, path, *, include_components: bool = True, project: Project | None = None,
-                 extra_sheets: dict[str, pd.DataFrame] | None = None) -> Path:
+                 extra_sheets: dict[str, pd.DataFrame] | None = None, labels: dict | None = None,
+                 note_text=None) -> Path:
     """
     写一个 .xlsx：每条谱图一个工作表（名称为“样品-谱图名”），最后是“信息”表。
-    extra_sheets 可以附加其他表，例如界面中的分析结果。
+    extra_sheets 可以附加其他表，例如界面中的分析结果；labels、note_text 见 info_frame。
     """
+    info_sheet = {**INFO_LABELS, **(labels or {})}["info_sheet"]
     records = list(records)
     if not records:
         raise ProjectError("Nothing to export.")
@@ -98,11 +113,12 @@ def export_excel(records, path, *, include_components: bool = True, project: Pro
         path = path.with_name(path.name + ".xlsx")
     path.parent.mkdir(parents=True, exist_ok=True)
     used: set[str] = set()
-    sheets = [sheet_name(f"{r.sample}-{r.name}", used) for r in records]
+    sheets = [sheet_name(f"{r.sample}-{r.name}", used, info_sheet) for r in records]
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         for r, sheet in zip(records, sheets, strict=True):
             r.to_dataframe(include_components=include_components).to_excel(writer, sheet_name=sheet, index=False)
         for name, df in (extra_sheets or {}).items():
-            df.to_excel(writer, sheet_name=sheet_name(name, used), index=False)
-        info_frame(records, project, sheets).to_excel(writer, sheet_name=INFO_SHEET, index=False)
+            df.to_excel(writer, sheet_name=sheet_name(name, used, info_sheet), index=False)
+        info_frame(records, project, sheets, labels=labels, note_text=note_text).to_excel(
+            writer, sheet_name=info_sheet, index=False)
     return path

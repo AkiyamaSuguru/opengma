@@ -54,7 +54,9 @@ from .storage import (
     SCHEMA_VERSION,
     load_project,
     project_to_datatree,
+    save_copy,
     save_project,
+    write_tree,
 )
 from .tables import (
     read_peak_csv,
@@ -95,10 +97,12 @@ __all__ = [
     "read_peak_csv",
     "read_phase_csv",
     "read_table",
+    "save_copy",
     "save_project",
     "set_kind",
     "suffixes_for",
     "table_to_frame",
     "write_peak_csv",
     "write_phase_csv",
+    "write_tree",
 ]

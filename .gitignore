@@ -239,3 +239,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 NoteBooks/MarimoNotes/
+
+# flet build 时从 src/GMA/UI/assets 复制的界面资源（scripts/build_app.py）
+src/assets/

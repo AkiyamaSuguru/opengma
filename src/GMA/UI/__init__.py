@@ -12,7 +12,11 @@ OpenGMA 的图形界面（Flet）。
 
 
 def run() -> None:
-    """启动图形界面。"""
+    """启动图形界面：先按设置选好界面语言，再导入界面模块（它们在导入时就会读取界面文字）。"""
+    from . import strings
+    from .settings import load_settings
+
+    strings.use(load_settings().language)
     from .app import run as _run
 
     _run()

@@ -4,8 +4,8 @@
 出版图对话框（方案 6.3）：预览是用 GMA 的出版图函数生成的图片，放在可以缩放、拖动的查看器中，
 预览就是导出的效果（P0 发现 MatplotlibChart 会把图拉伸到控件大小，所以不用它）。
 
-选项：尺寸、字体、字号、图例、隐藏纵轴刻度、分峰填充不透明度、子图、格式、分辨率；
-可以复制图片、复制为代码、导出。选项保存在模块标签的状态中，下次打开时沿用。
+选项：尺寸、字体、字号、图例、隐藏纵轴刻度、分峰填充不透明度、子图、格式、分辨率，以及模块自己的选项
+（视图的 figure_controls，如 SRIM 画哪些曲线）；可以复制图片、复制为代码、导出。选项保存在模块标签的状态中，下次打开时沿用。
 """
 from __future__ import annotations
 
@@ -161,7 +161,7 @@ class FigureDialog:
         fonts = list(figures.FIGURE_FONTS)
         if o.font not in fonts:
             fonts.insert(0, o.font)
-        font = ft.Dropdown(value=o.font, width=170, dense=True, text_size=th.SIZE_BODY,
+        font = ft.Dropdown(value=o.font, width=200, dense=True, text_size=th.SIZE_BODY,
                            options=[ft.DropdownOption(key=f, text=f) for f in fonts],
                            on_select=lambda e: self.change(font=e.control.value))
         legend_loc = ft.Dropdown(value=o.legend_loc, width=130, dense=True, text_size=th.SIZE_SMALL,
@@ -192,6 +192,9 @@ class FigureDialog:
                                [ft.DropdownOption(key=str(n), text=str(n)) for n in range(1, min(req.panels, 6) + 1)],
                                on_select=lambda e: self.change(n_cols=int(e.control.value)))
             controls.append(row(S.N_COLS, cols))
+        extra = getattr(self.view, "figure_controls", None)  # 模块自己的选项，如 SRIM 画哪些曲线
+        if extra is not None:
+            controls += extra(self, section, row)
         formats = [(k, t) for k, t in FORMAT_LABELS if k != figures.HTML or req.interactive]
         fmt = o.format if any(k == o.format for k, _ in formats) else "png"
         controls += [
@@ -203,6 +206,13 @@ class FigureDialog:
                               disabled=fmt in ("svg", "pdf", figures.HTML))),
         ]
         self.options_panel.controls = controls
+
+    def refresh(self) -> None:
+        """模块自己的选项变了：重新生成要画的图和选项面板，再重画预览。"""
+        self.request = self.make_request()
+        self.build_options()
+        self.options_panel.update()
+        self.schedule()
 
     def change(self, **values) -> None:
         data = self.options.to_dict()
@@ -312,7 +322,7 @@ class FigureDialog:
             else:
                 await self.app.clipboard.set_files([str(path)])
         except Exception as exc:  # noqa: BLE001
-            self.flash(f"{S.COPY_IMAGE_FAILED}：{exc}", error=True)
+            self.flash(S.LABELED.format(label=S.COPY_IMAGE_FAILED, value=exc), error=True)
             print(traceback.format_exc(), flush=True)
             return
         self.flash(S.IMAGE_COPIED)
@@ -336,7 +346,7 @@ class FigureDialog:
             await asyncio.to_thread(figures.render, self.request, self.options, path=path,
                                     palette=self.view.palette, use_latex=self.app.settings.latex)
         except Exception as exc:  # noqa: BLE001
-            self.flash(f"{S.FIGURE_FAILED}：{exc}", error=True)
+            self.flash(S.LABELED.format(label=S.FIGURE_FAILED, value=exc), error=True)
             print(traceback.format_exc(), flush=True)
             return
         finally:

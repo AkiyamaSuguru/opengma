@@ -12,7 +12,7 @@ from .base_view import MethodView
 
 
 class RamanView(MethodView):
-    FILTERS = (("all", S.FILTER_ALL), ("line", S.CHIP_LINE), ("fit", S.CHIP_FIT))
+    FILTERS = (("all", S.FILTER_ALL), ("line", S.FILTER_LINE), ("fit", S.FILTER_FIT))
     SUFFIXES = (".txt",)
     READERS = tuple(READERS)
 

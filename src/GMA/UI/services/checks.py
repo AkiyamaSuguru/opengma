@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from ...project import Project
 from ..strings import S
+from .importing import note_text
 
 INFO, WARNING = "info", "warning"
 
@@ -28,7 +29,7 @@ def data_issues(project: Project) -> list[Issue]:
     # 导入时的清洗记录
     for r in records:
         for note in r.clean_notes:
-            issues.append(Issue(INFO, f"{r.sample} / {r.method} / {r.name}", note.text(), (r.record_id,)))
+            issues.append(Issue(INFO, f"{r.sample} / {r.method} / {r.name}", note_text(note), (r.record_id,)))
     # 同一方法、同名的拟合谱（如各样品的 C1s）分峰名不一致
     groups = defaultdict(list)
     for r in records:
@@ -53,6 +54,6 @@ def _differences(variants: list[tuple[str, ...]]) -> str:
         for names in zip(*variants, strict=True):
             unique = list(dict.fromkeys(names))
             if len(unique) > 1:
-                parts.append(" ／ ".join(unique))
-        return "；".join(parts)
-    return " ／ ".join("、".join(v) for v in variants)
+                parts.append(S.VARIANT_SEP.join(unique))
+        return S.GROUP_SEP.join(parts)
+    return S.VARIANT_SEP.join(S.LIST_SEP.join(v) for v in variants)

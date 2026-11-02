@@ -1,12 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-界面上的全部文字。先只有中文；以后加英文时，按同样的名字再给一份即可。
+界面上的全部文字。中文写在下面的 S 中；英文写在 strings_en.py 的 EN 中，名字与 S 相同。
+
+启动时按设置调用 use(language)（GMA.UI.run() 中，在导入界面模块之前），之后 S 中就是所选语言的文字；
+界面模块在导入时就会读取 S（如默认参数、模块注册表），所以换语言要重新启动。
 
 只放文字，不放逻辑；带参数的句子写成 str.format 模板，例如 S.SELECTED_SAMPLES.format(n=1, total=3)。
-模块的名称和简介随模块定义放在 views/registry.py，主题色的名称放在 theme.py。
+中文和英文的标点、语序不同，拼接文字时也用这里的模板（如 S.LABELED、S.LIST_SEP），不在代码中写标点。
+英文的单复数写成 {n:file|files}：n 为 1 时用前一个词，否则用后一个（见 Text）。
 """
+import re
 from typing import ClassVar
+
+LANGUAGES = {"zh": "中文", "en": "English"}   # 设置中的界面语言：键 → 用这种语言写的名称
+_language = "zh"
 
 
 class S:
@@ -40,6 +48,13 @@ class S:
     REQUIRED = "不能为空"
     NUMBER_REQUIRED = "请输入数字"
     FILE_ERROR = "{name}：{error}"
+    LABELED = "{label}：{value}"         # 名称：内容
+    LIST_SEP = "、"                       # 并列的几项
+    GROUP_SEP = "；"                      # 并列的几组
+    VARIANT_SEP = " ／ "                   # 同一处的几种写法
+    TITLE_GAP = "　"                  # 加粗标题与正文之间
+    WITH_NOTE = "{text}（{note}）"         # 正文后面的括注
+    MONTHS: ClassVar[tuple[str, ...]] = ()  # 月份的名称（英文用 Jan、Feb…；中文直接写数字）
 
     # ---------- 启动器 ----------
     MODULES = "模块"
@@ -89,6 +104,36 @@ class S:
     NOT_YET = "这部分在下一阶段（{phase}）实现"
     SHORTCUT_HINT = "{action}（{keys}）"
 
+    # 新建窗口、自动备份、项目锁（P5）
+    NEW_WINDOW = "新建窗口"
+    NEW_WINDOW_OPENING = "正在打开新窗口…"
+    NEW_WINDOW_UNAVAILABLE = "这个版本的程序不能打开新窗口"
+    AUTOSAVED_AT = "已自动备份（{time}）"
+    RECOVER_TITLE = "发现自动备份"
+    RECOVER_BODY = "上次可能没有正常关闭，下面的项目有自动备份。打开后检查无误再保存；不需要的可以删除。"
+    RECOVER_OPEN = "打开"
+    RECOVER_DELETE = "删除备份"
+    RECOVER_LATER = "以后再说"
+    RECOVER_SAVED_AT = "备份于 {time}"
+    RECOVER_NEVER_SAVED = "还没有保存过的项目"
+    RECOVER_DELETED = "已删除自动备份"
+    RECOVERED = "已打开自动备份，检查无误后请保存"
+    LOCKED_TITLE = "项目已在别处打开"
+    LOCKED_BODY = "“{name}”已由 {who} 在 {time} 打开。"
+    LOCKED_OPEN_BODY = ("两个窗口同时修改同一个项目，后保存的会覆盖先保存的。以只读方式打开时可以查看、另存为新的文件，"
+                        "但不会写回原来的文件。")
+    LOCKED_SAVE_BODY = "保存会覆盖那边还没保存的修改，那边再保存时也会覆盖这里的修改。"
+    ANOTHER_WINDOW = "另一个窗口"
+    OPEN_READ_ONLY = "以只读方式打开"
+    OPEN_ANYWAY = "仍然编辑"
+    SAVE_ANYWAY = "仍然保存"
+    OPENED_READ_ONLY = "已以只读方式打开 {name}"
+    READ_ONLY = "只读"
+    READ_ONLY_TITLE = "{name}（只读）— OpenGMA"
+    READ_ONLY_SAVE = "这个项目是以只读方式打开的，请另存为新的文件"
+    READ_ONLY_HINT = "以只读方式打开：保存时另存为新的文件"
+    SHORTCUT_NOT_HERE = "这个模块中没有这项操作"
+
     # ---------- 项目总览 ----------
     OVERVIEW_TITLE = "项目总览"
     SAMPLES = "样品"
@@ -110,6 +155,7 @@ class S:
     EMPTY_PROJECT = "项目中还没有数据"
     EMPTY_PROJECT_HINT = "在模块中导入数据：XPS 支持 Avantage 导出的 .xlsx / .xls，Raman 支持 LabSpec 导出的 .txt，XRD 支持 D8 Advance 导出的 .txt。"
     IMPORT_DATA = "导入数据…"
+    IMPORT_INTO_MODULE = "选择表征方法，在对应的模块中导入"
     DATA_CHECK = "数据检查"
     NO_ISSUES = "没有需要注意的地方。"
     NAMING_INCONSISTENT = "{n} 个样品的分峰名不一致：{variants}"
@@ -131,6 +177,18 @@ class S:
     CREATED_AT = "创建于 {time}"
     FILE_PATH = "文件"
 
+    # ---------- 模块注册表：卡片上的名称、简介和支持的文件 ----------
+    MODULE_XPS_DESC = "Avantage 导出数据\n全谱 · 元素谱"
+    MODULE_XPS_FORMATS = "Avantage 导出的 .xlsx / .xls，其他软件导出的表格"
+    MODULE_RAMAN_DESC = "Horiba LabSpec\n谱线 · 拟合谱"
+    MODULE_RAMAN_FORMATS = "LabSpec 导出的 .txt，其他软件导出的表格"
+    MODULE_XRD_DESC = "Bruker D8 Advance\n图谱 · 参考物相"
+    MODULE_XRD_FORMATS = "D8 Advance 导出的 .txt，其他软件导出的表格"
+    MODULE_SRIM_TITLE = "SRIM · dpa"
+    MODULE_SRIM_DESC = "离子辐照\n损伤 dpa · 注入浓度"
+    MODULE_SALT_TITLE = "熔盐配比"
+    MODULE_SALT_DESC = "FLiNaK、FLiBe 等\n各盐的质量"
+
     # ---------- 模块页（P3 起逐个实现） ----------
     MODULE_EMPTY = "{title} 模块"
     MODULE_FORMATS = "支持的文件：{formats}"
@@ -144,6 +202,8 @@ class S:
     IMPORT_FOLDER = "选择文件夹…"
     SEARCH = "搜索样品或谱图"
     FILTER_ALL = "全部"
+    FILTER_LINE = "谱线"
+    FILTER_FIT = "拟合谱"
     ONLY_SAMPLE = "只看 {sample}"
     SHOW_ALL_SAMPLES = "显示全部样品"
     NO_MATCH = "没有符合条件的谱图"
@@ -340,6 +400,17 @@ class S:
     NOTE_EMPTY_COMPONENT = "忽略空分峰列 {column}"
     NOTE_DUPLICATE_X = "{n} 个重复横轴值"
     NOTE_SORTED = "已按横轴排序"
+    NOTE_DROPPED_FULL = "去除 {n} 行空值或非数值数据（数据第 {rows} 行{more}）"
+    NOTE_MORE = "等"
+    NOTE_EMPTY_COMPONENT_FULL = "分峰列 {column} 中没有数值，已忽略"
+    NOTE_DUPLICATE_X_FULL = "横轴有 {n} 个重复的值，已保留"
+    NOTE_SORTED_FULL = "横轴不是单调的，已按横轴从小到大排列"
+    # 导出 Excel 时“信息”表的表名和列名（键见 GMA.project.exporters.INFO_LABELS）
+    EXPORT_LABELS: ClassVar[dict[str, str]] = {
+        "info_sheet": "信息", "sheet": "工作表", "sample": "样品", "method": "方法", "kind": "类型", "name": "名称",
+        "points": "点数", "components": "分峰", "component_mode": "分峰数据模式", "source": "来源文件",
+        "sha256": "SHA-256", "reader": "读取器", "imported_at": "导入时间", "gma_version": "GMA 版本",
+        "clean_notes": "清洗记录", "notes": "备注", "list_sep": "、", "note_sep": "；"}
     READ_FAILED = "无法读取：{reason}"
     IMPORT_HINT = "黄色为文件中的原名，可以现在改，也可以导入后在“分峰”面板改"
     IMPORT_N = "导入 {n} 个文件"
@@ -444,7 +515,136 @@ class S:
     RECENT_LIMIT = "最近项目数量"
     LANGUAGE = "界面语言"
     LANGUAGE_ZH = "中文"
+    LANGUAGE_RESTART = "重新启动 OpenGMA 后生效"
+    RESTART_NOW = "现在重新启动"
+    COLOR_TEAL = "青蓝"
+    COLOR_INDIGO = "墨蓝"
+    COLOR_PINE = "松绿"
+    COLOR_OCHRE = "赭石"
+    COLOR_GRAPHITE = "石墨"
     SETTINGS_SAVED_HINT = "设置保存在 {path}"
+
+    # ---------- 计算工具：SRIM ----------
+    SRIM_FILES = "SRIM 输出文件"
+    SRIM_CHOOSE = "选择文件…"
+    SRIM_CHOOSE_TIP = "选择 TRIM 输出的 VACANCY.txt、RANGE.txt（可以一起选）；同一文件夹中的另一个文件会一起读取"
+    SRIM_RANGE_OPTIONAL = "RANGE.txt（可选）"
+    SRIM_NOT_LOADED = "未读取"
+    SRIM_REMOVE = "移除"
+    SRIM_MODE_QUICK = "Quick K-P"
+    SRIM_MODE_FULL = "Full Cascade"
+    SRIM_SUMMARY = "{ion} {energy} keV → {target} · {mode} · {ions} 个离子"
+    SRIM_ALSO_READ = "同时读取了同一文件夹中的 {name}"
+    SRIM_READ_FAILED = "无法读取 SRIM 文件"
+    SRIM_NOT_SRIM = "{name} 不是能识别的 VACANCY.txt 或 RANGE.txt。"
+    SRIM_MISMATCH = "RANGE.txt 与 VACANCY.txt 不是同一次计算（离子、能量或深度区间不同），没有计算注入浓度。"
+    FLUENCE = "注量"
+    FLUENCE_DIRECT = "注量"
+    FLUENCE_FLUX = "束流 × 时间"
+    FLUX = "束流"
+    IRRADIATION_TIME = "时间"
+    FLUENCE_RESULT = "注量 = {value} ions/cm²"
+    ATOMIC_DENSITY = "原子密度"
+    DENSITY_HINT = "默认取文件头中各层的值；改过的层可以恢复。"
+    RESTORE_FILE_VALUE = "恢复文件中的值（{value}）"
+    POSITIVE_REQUIRED = "请输入正数"
+    SRIM_EMPTY_TITLE = "SRIM 损伤计算"
+    SRIM_EMPTY_HINT = ("读取 TRIM 输出的 VACANCY.txt（损伤）和 RANGE.txt（注入离子），按注量计算 dpa 和注入离子浓度"
+                       "随深度的分布。Quick K-P 和 Full Cascade 的输出都可以，多层靶按层使用各自的原子密度。")
+    SRIM_FORMULA = ("dpa = 空位（vacancies/(Å·ion)）× 10^8 × 注量 ÷ 原子密度\n"
+                    "注入浓度 C = 离子分布 × 注量，at.% = C ÷ (C + N) × 100")
+    SRIM_FORMULA_FULL = "Full Cascade 的空位为各元素空位之和（不加 Knock-Ons），与文件头的 Total Target Vacancies 一致。"
+    SHOW_DAMAGE = "损伤 (dpa)"
+    SHOW_IONS = "注入离子 (at.%)"
+    BY_ELEMENT = "按元素"
+    BY_ELEMENT_TIP = "分别画出各元素的 dpa（之和为总 dpa），只有 Full Cascade 的输出有"
+    DEPTH_UNIT = "深度单位"
+    RESULTS = "结果"
+    DAMAGE = "损伤"
+    PEAK_VALUE = "峰值"
+    AT_DEPTH = "所在深度"
+    AVERAGE = "平均"
+    AVERAGE_END_HINT = "最深处"
+    AVERAGE_RANGE_TIP = "留空表示从表面 / 到最深处；只覆盖深度区间的一部分时按覆盖的长度计入"
+    VACANCIES_PER_ION = "每个离子产生的空位"
+    VACANCIES_CHECK = "{value}（文件头 {reported}）"
+    DPA_RATE = "峰值损伤速率"
+    IMPLANTED = "注入离子"
+    CONCENTRATION_VALUE = "{percent} at.%（{appm} appm）"
+    MEAN_RANGE = "平均射程"
+    RANGE_VALUE = "{value}（歧离 {straggling}）"
+    STOPPED = "停留在靶中的离子"
+    NEED_RANGE = "读取 RANGE.txt 后显示注入离子的浓度。"
+    NEED_VACANCY = "读取 VACANCY.txt 后显示损伤。"
+    CONDITIONS = "计算条件"
+    EXPORT_PROFILE = "导出数据…"
+    EXPORTED_TO = "已导出到 {path}"
+    FIGURE_PARTS = "曲线"
+    FIGURE_DAMAGE = "dpa"
+    FIGURE_IONS = "注入离子浓度"
+    FIGURE_ELEMENT_DPA = "各元素的 dpa"
+    SRIM_INFO_SHEET = "信息"
+    INFO_ITEM = "项目"
+    INFO_VALUE = "值"
+
+    # 复制为代码中的注释
+    CODE_PROJECT_FILE = "项目.nc"
+    CODE_HEADER_FIGURE = "OpenGMA 生成：复现出版图。可以粘贴到 marimo、Jupyter 或脚本中运行。"
+    CODE_NOT_SAVED = "项目还没有保存：先保存项目，再把 {file} 改成项目文件的路径。"
+    CODE_DIRTY = "代码读取的是项目文件中保存的数据；项目还有未保存的修改，请先保存。"
+    CODE_FONTS = "登记 OpenGMA 附带的字体：图中的中文用 {font} 显示，与预览相同"
+    CODE_SUBSTITUTED = "预览时本机没有 {font}，用了字宽相同的代替字体；在有这个字体的电脑上运行即可。"
+    CODE_HEADER_SRIM = "OpenGMA 生成：SRIM 损伤（dpa）和注入离子浓度。可以粘贴到 marimo、Jupyter 或脚本中运行。"
+    CODE_FLUX = "束流 ions/(cm²·s) × 时间（h）× 3600"
+    CODE_PROFILE = "注量单位 ions/cm²；原子密度默认取文件头中的值"
+    CODE_PEAK = "峰值 dpa 和所在深度（nm）"
+    CODE_AVERAGE = "深度范围（nm）内的平均 dpa；None 表示从表面 / 到最深处"
+    CODE_IONS_PEAK = "注入离子的峰值浓度（at.%）和所在深度（nm）"
+    CODE_HEADER_SALT = "OpenGMA 生成：熔盐配比。可以粘贴到 marimo、Jupyter 或脚本中运行。"
+    CODE_SALT = "摩尔比例自动归一化；总质量单位 g"
+
+    # ---------- 计算工具：熔盐配比 ----------
+    SALT_COMPOSITION = "组成"
+    SALT_PRESET = "预设"
+    SALT_PRESET_MODIFIED = "已修改"
+    SALT_PRESET_MENU = "预设…"
+    SALT_SAVE_PRESET = "保存为预设…"
+    SALT_DELETE_PRESET = "删除预设“{name}”"
+    SALT_RESTORE_PRESETS = "恢复内置预设"
+    SALT_PRESET_NAME = "预设名称"
+    SALT_PRESET_SAVED = "已保存预设“{name}”"
+    SALT_PRESET_EXISTS = "已有名为“{name}”的预设，覆盖它吗？"
+    SALT_PRESET_DELETED = "已删除预设“{name}”"
+    SALT_DELETE_PRESET_BODY = "删除预设“{name}”？内置预设可以用“恢复内置预设”找回。"
+    SALT_RESTORE_BODY = "恢复内置的预设组成？你保存或修改过的预设都会被替换。"
+    SALT_PRESETS_RESTORED = "已恢复内置预设"
+    SALT_FORMULA = "化学式"
+    SALT_AMOUNT = "摩尔比例"
+    SALT_AMOUNT_TIP = "mol%，也可以写成任意比例（如 2 : 1），自动换算为摩尔分数"
+    SALT_MOLAR_MASS = "摩尔质量（g/mol）"
+    SALT_MOLAR_MASS_TIP = "留空时按化学式和 IUPAC 标准原子质量计算；同位素富集的盐（如 ⁷LiF）请直接填写"
+    SALT_ADD = "添加一种盐"
+    SALT_REMOVE = "移除这一行"
+    SALT_SUM_PERCENT = "合计 {value} mol%"
+    SALT_SUM_RATIO = "比例合计 {value}，已换算为摩尔分数"
+    SALT_TOTAL_MASS = "总质量"
+    SALT_WEIGH = "称量"
+    SALT_COL_SALT = "盐"
+    SALT_COL_MOLE = "摩尔分数（mol%）"
+    SALT_COL_MOLAR_MASS = "摩尔质量（g/mol）"
+    SALT_COL_MASS_PERCENT = "质量分数（wt%）"
+    SALT_COL_MASS = "质量（g）"
+    SALT_TOTAL = "合计"
+    SALT_COPY_TABLE = "复制表格"
+    SALT_TABLE_COPIED = "已复制，可以粘贴到 Excel 或实验记录中"
+    SALT_NOTE = ("原子质量为 IUPAC 标准原子质量（有范围的元素用约定值）；化学式支持括号和结晶水，如 Ca(NO3)2、"
+                 "MgCl2·6H2O。")
+    SALT_ERROR_ROW = "第 {row} 行：{error}"
+    SALT_BAD_FORMULA = "化学式无法识别"
+    SALT_DUPLICATE = "{salt} 出现了不止一次"
+    SALT_EMPTY = "添加至少一种盐"
+    SALT_ZERO = "摩尔比例之和不能为 0"
+    SALT_DEFAULT_NAME = "熔盐配比"
 
     # ---------- 关于 ----------
     VERSION = "版本 {version}"
@@ -453,3 +653,43 @@ class S:
     HOMEPAGE = "GitHub 仓库"
     ENVIRONMENT = "运行环境"
     COPY_ENVIRONMENT = "复制环境信息"
+
+
+_PLURAL = re.compile(r"\{(\w+):([^{}|]*)\|([^{}]*)\}")
+
+
+def _is_one(value) -> bool:
+    try:
+        return float(str(value).replace(" ", "").replace(",", "")) == 1
+    except ValueError:
+        return False
+
+
+class Text(str):
+    """带单复数的模板（英文）：format() 先把 {n:file|files} 换成 n 对应的单数或复数，再照常替换参数。"""
+
+    def format(self, *args, **kwargs) -> str:
+        def pick(m):
+            return m.group(2) if _is_one(kwargs.get(m.group(1))) else m.group(3)
+        return str.format(_PLURAL.sub(pick, self), *args, **kwargs)
+
+
+def use(language: str) -> str:
+    """
+    切换界面语言：language 为 LANGUAGES 中的键，不认识的语言用中文。返回实际使用的语言。
+    在导入界面模块之前调用（见 GMA.UI.run()）；运行中再换语言要重新启动。
+    """
+    global _language
+    if language == "en":
+        from .strings_en import EN
+        for name, value in EN.items():
+            if isinstance(value, str) and _PLURAL.search(value):
+                value = Text(value)
+            setattr(S, name, value)
+        _language = "en"
+    return _language
+
+
+def language() -> str:
+    """当前的界面语言。"""
+    return _language

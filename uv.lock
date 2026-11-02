@@ -1186,7 +1186,6 @@ dependencies = [
     { name = "flet" },
     { name = "flet-charts" },
     { name = "h5netcdf", extra = ["h5py"] },
-    { name = "marimo" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -1204,13 +1203,15 @@ dev = [
     { name = "flet-web" },
     { name = "pytest" },
 ]
+notebook = [
+    { name = "marimo" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "flet", specifier = ">=1.0.5" },
     { name = "flet-charts", specifier = ">=1.0.5" },
     { name = "h5netcdf", extras = ["h5py"], specifier = ">=1.8.2" },
-    { name = "marimo", specifier = ">=0.23.16" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.3" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -1228,6 +1229,7 @@ dev = [
     { name = "flet-web", specifier = ">=1.0.5" },
     { name = "pytest", specifier = ">=9.2.0" },
 ]
+notebook = [{ name = "marimo", specifier = ">=0.23.16" }]
 
 [[package]]
 name = "openpyxl"

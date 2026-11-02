@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """
 还没有实现的模块标签的占位页：模块图标、支持的文件和项目中已有的数据量。
-标签的状态原样保存，以后的版本可以直接使用。XPS、Raman、XRD 的模块页见 base_view.py 和各自的文件。
+标签的状态原样保存，以后的版本可以直接使用。XPS、Raman、XRD 的模块页见 base_view.py 和各自的文件，
+计算工具见 tool_view.py、srim_view.py、salt_view.py。
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ class ModuleView(TabView):
         return ""
 
     async def on_shortcut(self, key: str, shift: bool) -> bool:
-        self.app.not_yet("P5")
+        self.app.toast(S.PLANNED)
         return True
 
     def build(self) -> ft.Control:
@@ -43,6 +44,6 @@ class ModuleView(TabView):
         if n:
             lines.append(w.muted(S.MODULE_DATA.format(n=n, title=spec.title), p, th.SIZE_BODY))
         lines.append(ft.FilledButton(S.IMPORT_DATA, icon=ft.Icons.UPLOAD_FILE_OUTLINED, disabled=True,
-                                     tooltip=S.NOT_YET.format(phase="P5")))
+                                     tooltip=S.PLANNED))
         return ft.Container(expand=True, alignment=ft.Alignment.CENTER, content=ft.Column(
             lines, spacing=12, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER))

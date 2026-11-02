@@ -15,8 +15,11 @@ from pathlib import Path
 
 import flet as ft
 
+from .strings import S
+
 DEFAULT_PRIMARY = "#146C7E"
-PRESETS = [("青蓝", "#146C7E"), ("墨蓝", "#2C4F8C"), ("松绿", "#2F7A55"), ("赭石", "#A2552B"), ("石墨", "#4B5563")]
+PRESETS = [(S.COLOR_TEAL, "#146C7E"), (S.COLOR_INDIGO, "#2C4F8C"), (S.COLOR_PINE, "#2F7A55"),
+           (S.COLOR_OCHRE, "#A2552B"), (S.COLOR_GRAPHITE, "#4B5563")]
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 # 方案 11.1 中的颜色

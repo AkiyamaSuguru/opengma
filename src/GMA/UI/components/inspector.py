@@ -14,6 +14,7 @@ import flet as ft
 
 from .. import theme as th
 from ..services import analysis
+from ..services.importing import note_text
 from ..services.text import local_time, unit
 from ..strings import S
 from . import widgets as w
@@ -371,7 +372,7 @@ class Inspector:
                               else S.COMPONENT_RELATIVE)]
         if src.get("derived_from"):
             parts.append(self.kv(S.INFO_DERIVED, src["derived_from"]))
-        notes = [n.text() for n in record.clean_notes]
+        notes = [note_text(n) for n in record.clean_notes]
         parts.append(self.section(S.INFO_CLEAN))
         if notes:
             parts += [ft.Row([ft.Icon(ft.Icons.INFO_OUTLINE, size=15, color=p.primary),

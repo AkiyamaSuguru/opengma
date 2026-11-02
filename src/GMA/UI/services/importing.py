@@ -39,6 +39,22 @@ def group(n: int) -> str:
     return f"{n:,}".replace(",", " ")
 
 
+def note_text(note) -> str:
+    """清洗记录的完整说明（检查器、数据检查、导出的“信息”表），用界面语言。"""
+    d = note.detail
+    if note.code == "dropped_rows":
+        rows = S.LIST_SEP.join(str(r) for r in d.get("rows", [])[:10])
+        return S.NOTE_DROPPED_FULL.format(n=d.get("count", 0), rows=rows,
+                                          more=S.NOTE_MORE if d.get("count", 0) > 10 else "")
+    if note.code == "empty_component":
+        return S.NOTE_EMPTY_COMPONENT_FULL.format(column=d.get("column", ""))
+    if note.code == "duplicate_x":
+        return S.NOTE_DUPLICATE_X_FULL.format(n=d.get("count", 0))
+    if note.code == "sorted":
+        return S.NOTE_SORTED_FULL
+    return note.text()
+
+
 def note_short(note) -> str:
     d = note.detail
     if note.code == "dropped_rows":

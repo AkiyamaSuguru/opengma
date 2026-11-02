@@ -84,6 +84,31 @@ async def confirm_unsaved(page: ft.Page, p: Palette, name: str) -> str:
     return str(await _ask(page, build, dismissed="cancel"))
 
 
+async def ask_locked(page: ft.Page, p: Palette, name: str, info: dict, *, saving: bool = False) -> str | None:
+    """
+    项目已在别的窗口（或别的电脑）中打开时询问。打开时返回 "read_only"、"edit"，保存时返回 "edit"；
+    取消时返回 None。
+    """
+    from ..services.text import when
+
+    who = "@".join(x for x in (info.get("user"), info.get("host")) if x) or S.ANOTHER_WINDOW
+    body = S.LOCKED_BODY.format(name=name, who=who, time=when(info.get("opened_at") or ""))
+
+    def build(finish):
+        actions = [ft.TextButton(S.CANCEL, on_click=lambda e: finish(None))]
+        if saving:
+            actions.append(ft.FilledButton(S.SAVE_ANYWAY, on_click=lambda e: finish("edit"),
+                                           style=ft.ButtonStyle(bgcolor=p.error, color="#FFFFFF")))
+        else:
+            actions += [ft.TextButton(S.OPEN_ANYWAY, on_click=lambda e: finish("edit")),
+                        ft.FilledButton(S.OPEN_READ_ONLY, on_click=lambda e: finish("read_only"))]
+        text = S.LOCKED_SAVE_BODY if saving else S.LOCKED_OPEN_BODY
+        return _dialog(p, S.LOCKED_TITLE, ft.Column([ft.Text(body, size=th.SIZE_BODY, color=p.text),
+                                                     ft.Text(text, size=th.SIZE_SMALL, color=p.muted)],
+                                                    spacing=8, tight=True), actions, width=460)
+    return await _ask(page, build, dismissed=None)
+
+
 async def prompt_text(page: ft.Page, p: Palette, title: str, label: str, value: str = "", *,
                       validate=None) -> str | None:
     """输入一行文字；取消时返回 None。validate(text) 返回错误说明或 None。"""
