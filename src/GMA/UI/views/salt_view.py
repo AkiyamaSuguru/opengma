@@ -16,7 +16,16 @@ from typing import ClassVar
 
 import flet as ft
 
-from ...SC.Salts import MASS, MASS_PERCENT, MOLAR_MASS, MOLE_PERCENT, PRESETS, SALT, molar_mass, salt_masses
+from ...SC.Salts import (
+    MASS,
+    MASS_PERCENT,
+    MOLAR_MASS,
+    MOLE_PERCENT,
+    PRESETS,
+    SALT,
+    molar_mass,
+    salt_masses,
+)
 from .. import theme as th
 from ..components import widgets as w
 from ..components.dialogs import confirm, prompt_text

@@ -255,3 +255,62 @@ def test_new_window_command(tmp_path, monkeypatch):
     assert launch.new_window_command() == [str(program.resolve())]
     monkeypatch.setenv(launch.NEW_WINDOW_ENV, "1")
     assert launch.is_new_window() and not launch.is_new_window()   # 读过之后清除
+
+
+# ============================================================
+# 英文界面
+# ============================================================
+def placeholders(text: str) -> set[str]:
+    return {m.group(1) for m in re.finditer(r"\{(\w*)(?:[:!][^}]*)?\}", text)}
+
+
+def test_english_strings_match_chinese():
+    """每个中文文字都有英文，模板中的参数相同（缺了参数，format 时会出错或丢掉内容）。"""
+    from GMA.UI.strings_en import EN
+    text = Path(strings.__file__).read_text(encoding="utf-8")
+    names = re.findall(r"^    ([A-Z][A-Z0-9_]+)\s*(?::[^=\n]+)?=", text, re.MULTILINE)
+    zh = {name: strings.S.__dict__[name] for name in names}
+    assert sorted(set(zh) - set(EN)) == [] and sorted(set(EN) - set(zh)) == []
+    for name, value in zh.items():
+        en = EN[name]
+        assert type(en) is type(value), name
+        if isinstance(value, str):
+            assert placeholders(en) == placeholders(value), name
+        elif isinstance(value, dict):
+            assert set(en) == set(value), name
+    assert len(EN["MONTHS"]) == 12 and set(strings.LANGUAGES) == {"zh", "en"}
+
+
+def test_plural_templates():
+    """英文的单复数：{n:file|files} 按 n 选词，其他参数照常替换；中文模板不受影响。"""
+    text = strings.Text("{n} {n:file|files} in {folder}")
+    assert text.format(n=1, folder="a") == "1 file in a" and text.format(n=0, folder="a") == "0 files in a"
+    assert text.format(n="1", folder="a") == "1 file in a" and text.format(n="2 000", folder="a") == "2 000 files in a"
+    assert strings.Text("{n:it was|they were}").format(n=1) == "it was"
+    assert strings.S.IMPORT_N.format(n=1) == "导入 1 个文件"
+
+
+def test_english_startup(tmp_path):
+    """按设置选英文后再导入界面模块：注册表、主题色、默认参数都是英文（在新的进程中试，不影响其他测试）。"""
+    import subprocess
+    import textwrap
+    (tmp_path / "settings.json").write_text(json.dumps({"language": "en"}), encoding="utf-8")
+    code = textwrap.dedent("""
+        from GMA.UI import strings
+        from GMA.UI.settings import load_settings
+        assert strings.use(load_settings().language) == 'en'
+        from GMA.UI.views import registry
+        from GMA.UI import theme
+        from GMA.UI.services.text import when
+        assert registry.get('salt').title == 'Molten salts', registry.get('salt').title
+        assert registry.CATEGORY_TITLES[registry.TOOL] == 'Calculation tools'
+        assert theme.PRESETS[0][0] == 'Teal'
+        assert when('2025-10-28T09:00:00+00:00').startswith('Oct 28')
+        assert strings.S.IMPORT_N.format(n=1) == 'Import 1 file' and strings.S.IMPORT_N.format(n=3) == 'Import 3 files'
+        assert strings.S.TABLE_SIZE.format(rows='1 000', cols=1) == '1 000 rows · 1 column'
+        import GMA.UI.app
+        print('ok')
+    """)
+    result = subprocess.run([sys.executable, "-c", code], env={**os.environ, "OPENGMA_HOME": str(tmp_path)},
+                            capture_output=True, text=True, timeout=120, check=False)
+    assert result.returncode == 0 and result.stdout.strip().endswith("ok"), result.stderr

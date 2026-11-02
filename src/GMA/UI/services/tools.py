@@ -13,7 +13,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from ...SC.Salts import MASS, MASS_PERCENT, MOLAR_MASS, MOLE_PERCENT, SALT, parse_formula
+from ...SC.Salts import (
+    MASS,
+    MASS_PERCENT,
+    MOLAR_MASS,
+    MOLE_PERCENT,
+    SALT,
+    parse_formula,
+)
 from ...SC.SRIM import DEPTH, DPA, IONS_PERCENT
 from ..strings import S
 from .codegen import safe_stem

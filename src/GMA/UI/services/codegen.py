@@ -10,10 +10,10 @@ from __future__ import annotations
 import keyword
 import re
 
+from ..strings import S
 from .figures import CJK_FONT, FigureOptions, PlotRequest, ProfileRequest, figure_size
 
 DEFAULT_PALETTE = "tab10"
-PROJECT_PLACEHOLDER = "项目.nc"
 
 
 def identifier(name: str, used: set[str]) -> str:
@@ -74,22 +74,22 @@ def figure_code(request: PlotRequest, options: FigureOptions, *, project_path=No
     生成复现出版图的代码。project_path 为 None（项目还没有保存）时用占位的文件名并提示先保存。
     """
     plotter = f"{request.method}Plotter"
-    lines = ["# OpenGMA 生成：复现出版图。可以粘贴到 marimo、Jupyter 或脚本中运行。"]
+    lines = [f"# {S.CODE_HEADER_FIGURE}"]
     if isinstance(request, ProfileRequest):  # 计算工具：数据由 setup 中的代码生成
         return _plot_code(lines + request.setup + [""], request, options, "data", palette, use_latex, substituted,
                           cjk=False)
     if project_path is None:
-        lines.append(f"# 项目还没有保存：先保存项目，再把 {PROJECT_PLACEHOLDER} 改成项目文件的路径。")
+        lines.append(f"# {S.CODE_NOT_SAVED.format(file=S.CODE_PROJECT_FILE)}")
     elif dirty:
-        lines.append("# 代码读取的是项目文件中保存的数据；项目还有未保存的修改，请先保存。")
+        lines.append(f"# {S.CODE_DIRTY}")
     cjk = has_cjk(request)
     lines += [f"from GMA import {plotter}", "from GMA.project import load_project"]
     if cjk:
         lines.append("from GMA.UI.services.figures import register_fonts")
     lines.append("")
     if cjk:
-        lines += [f"register_fonts()  # 登记 OpenGMA 附带的字体：图中的中文用 {CJK_FONT} 显示，与预览相同", ""]
-    path = str(project_path) if project_path is not None else PROJECT_PLACEHOLDER
+        lines += [f"register_fonts()  # {S.CODE_FONTS.format(font=CJK_FONT)}", ""]
+    path = str(project_path) if project_path is not None else S.CODE_PROJECT_FILE
     lines.append(f"project = load_project({path!r})")
 
     used: set[str] = {"project", "plotter", "fig", "axes", "data"}
@@ -123,7 +123,7 @@ def _plot_code(lines: list[str], request: PlotRequest, options: FigureOptions, d
     if use_latex:
         args.append("use_latex=True")
     if substituted:
-        lines.append(f"# 预览时本机没有 {substituted}，用了字宽相同的代替字体；在有这个字体的电脑上运行即可。")
+        lines.append(f"# {S.CODE_SUBSTITUTED.format(font=substituted)}")
     lines.append(f"plotter = {plotter}({', '.join(args)})")
 
     stem = file_stem(request)

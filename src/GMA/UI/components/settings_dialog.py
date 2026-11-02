@@ -12,6 +12,7 @@ import flet as ft
 from ...CM.Raman.loader import READERS as RAMAN_READERS
 from ...CM.XPS.loader import READERS as XPS_READERS
 from ...CM.XRD.loader import READERS as XRD_READERS
+from .. import strings
 from .. import theme as th
 from ..services.figures import FIGURE_FONTS
 from ..services.text import short_path
@@ -244,5 +245,30 @@ class SettingsDialog:
             self.row(S.ON_STARTUP, self.segmented("startup", [("launcher", S.STARTUP_LAUNCHER),
                                                                ("last_project", S.STARTUP_LAST)])),
             self.row(S.RECENT_LIMIT, self.dropdown(str(s.recent_limit), ["3", "5", "10"], set_limit, width=120)),
-            self.row(S.LANGUAGE, self.dropdown("zh", ["zh"], lambda e: None, width=120, labels={"zh": S.LANGUAGE_ZH})),
+            self.language_row(),
         ]
+
+    def language_row(self) -> ft.Control:
+        """界面语言：保存在设置中，重新启动后生效（界面模块在启动时读取文字）。"""
+        p, s = self.app.p, self.s
+        pending = s.language != strings.language()
+        restart = ft.TextButton(S.RESTART_NOW, icon=ft.Icons.RESTART_ALT_ROUNDED, visible=pending,
+                                on_click=lambda e: self.app.page.run_task(self.restart))
+        hint = w.faint(S.LANGUAGE_RESTART, p)
+        hint.visible = pending
+
+        def on_select(e):
+            s.language = e.control.value or "zh"
+            self.changed()
+            hint.visible = restart.visible = s.language != strings.language()
+            hint.update()
+            restart.update()
+
+        return ft.Column([w.text(S.LANGUAGE, p, th.SIZE_BODY, bold=True),
+                          ft.Row([self.dropdown(s.language, list(strings.LANGUAGES), on_select, width=140,
+                                                labels=strings.LANGUAGES), restart], spacing=10),
+                          hint], spacing=6, tight=True)
+
+    async def restart(self) -> None:
+        close(self.dialog)
+        await self.app.restart()

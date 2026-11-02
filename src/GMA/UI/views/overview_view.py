@@ -20,6 +20,7 @@ from .. import theme as th
 from ..components import widgets as w
 from ..components.dialogs import confirm, prompt_text, show_error, toast
 from ..services.checks import WARNING, data_issues
+from ..services.importing import note_text
 from ..services.text import local_time, short_path
 from ..strings import S
 from . import registry
@@ -245,7 +246,7 @@ class OverviewView(TabView):
                 rows.append(ft.Row([
                     ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED if warn else ft.Icons.INFO_OUTLINE, size=16,
                             color=p.warning if warn else p.primary),
-                    ft.Text(spans=[ft.TextSpan(issue.title + "　", ft.TextStyle(weight=ft.FontWeight.W_600,
+                    ft.Text(spans=[ft.TextSpan(issue.title + S.TITLE_GAP, ft.TextStyle(weight=ft.FontWeight.W_600,
                                                                                 color=p.text)),
                                    ft.TextSpan(issue.text, ft.TextStyle(color=p.muted))],
                             size=th.SIZE_SMALL, expand=True, selectable=True),
@@ -309,7 +310,8 @@ class OverviewView(TabView):
                 if not path:
                     return
                 out = await asyncio.to_thread(export_excel, records, path,
-                                              include_components=self.include_components, project=self.project)
+                                              include_components=self.include_components, project=self.project,
+                                              labels=S.EXPORT_LABELS, note_text=note_text)
                 message = S.EXPORTED_EXCEL.format(path=short_path(out))
             else:
                 folder = await app.file_picker.get_directory_path(dialog_title=S.EXPORT_DATA)

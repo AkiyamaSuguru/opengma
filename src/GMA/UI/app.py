@@ -20,6 +20,7 @@ import asyncio
 import contextlib
 import traceback
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 import flet as ft
@@ -277,10 +278,19 @@ class App:
         except Exception:  # noqa: BLE001 - 备份失败不打扰用户，下次再试
             print(traceback.format_exc(), flush=True)
             return
-        from datetime import datetime
-        self.last_backup = datetime.now()
+        self.last_backup = datetime.now().astimezone()
         if self.workspace is not None and self.session is session:
             self.workspace.set_status(S.AUTOSAVED_AT.format(time=self.last_backup.strftime("%H:%M")))
+
+    async def restart(self) -> None:
+        """重新启动（如换了界面语言）：先处理未保存的修改，再启动新的进程、退出这个进程。"""
+        if not await self.confirm_discard():
+            return
+        self.remember_recent()
+        if not launch.open_new_window():   # 打包的程序中找不到程序本身时，请用户自己重新启动
+            self.toast(S.LANGUAGE_RESTART)
+            return
+        await self.quit()
 
     def new_window(self, e=None) -> None:
         if not launch.open_new_window():

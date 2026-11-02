@@ -35,9 +35,10 @@ def when(iso: str, now: datetime | None = None) -> str:
         return S.TODAY.format(time=t.strftime("%H:%M"))
     if days == 1:
         return S.YESTERDAY.format(time=t.strftime("%H:%M"))
+    month = S.MONTHS[t.month - 1] if len(S.MONTHS) == 12 else t.month   # 英文写月份的名称
     if t.year == now.year:
-        return S.DATE_MONTH_DAY.format(m=t.month, d=t.day)
-    return S.DATE_FULL.format(y=t.year, m=t.month, d=t.day)
+        return S.DATE_MONTH_DAY.format(m=month, d=t.day)
+    return S.DATE_FULL.format(y=t.year, m=month, d=t.day)
 
 
 def short_path(path, home: Path | None = None) -> str:

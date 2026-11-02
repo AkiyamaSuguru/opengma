@@ -142,13 +142,10 @@ class SRIMView(ToolView):
         narrow = width < NARROW
         self.avg_text = ft.Text("", size=15, weight=ft.FontWeight.W_600, color=p.text, selectable=True)
         self.fluence_text = ft.Text("", size=th.SIZE_SMALL, color=p.muted)
-        compact = ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=10))
-        footer = ft.Row([
-            ft.OutlinedButton(S.COPY_CODE, icon=ft.Icons.CODE_ROUNDED, on_click=self.copy_code, expand=True,
-                              style=compact),
-            ft.FilledButton(S.EXPORT_PROFILE, icon=ft.Icons.DOWNLOAD_ROUNDED, on_click=self.export, expand=True,
-                            style=compact),
-        ], spacing=8)
+        footer = ft.Column([   # 上下排列：英文的按钮文字较长，并排时会折行
+            ft.FilledButton(S.EXPORT_PROFILE, icon=ft.Icons.DOWNLOAD_ROUNDED, on_click=self.export),
+            ft.OutlinedButton(S.COPY_CODE, icon=ft.Icons.CODE_ROUNDED, on_click=self.copy_code),
+        ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.STRETCH, tight=True)
         left = self.card(S.CONDITIONS, self.input_controls(), width=None if narrow else SIDE_W, fill=not narrow)
         right = self.card(S.RESULTS, [self.warning_box, self.results], width=None if narrow else SIDE_W,
                           footer=footer, fill=not narrow)
@@ -209,7 +206,8 @@ class SRIMView(ToolView):
                                     disabled=overrides[i] is None)
             controls.append(ft.Row([
                 self.number_field(overrides[i] if overrides[i] is not None else layer.density, changed,
-                                  label=f"{layer.name}（{elements}）" if elements else layer.name,
+                                  label=S.WITH_NOTE.format(text=layer.name, note=elements) if elements
+                                  else layer.name,
                                   suffix="atoms/cm³", expand=True),
                 restore], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER))
         controls.append(w.faint(S.DENSITY_HINT, p, th.SIZE_TINY))
@@ -406,7 +404,7 @@ class SRIMView(ToolView):
         base = self.base
         lines = [f"{base.ion} {base.energy:g} keV · {S.FLUENCE} {sci(self.inputs().total_fluence)} ions/cm²"]
         for layer, override in zip(base.layers, self.densities(), strict=True):
-            lines.append(f"{layer.name}：{sci(override or layer.density)} atoms/cm³")
+            lines.append(S.LABELED.format(label=layer.name, value=f"{sci(override or layer.density)} atoms/cm³"))
         return "\n".join(lines)
 
     # ============================================================
@@ -483,7 +481,7 @@ class SRIMView(ToolView):
         if errors:
             self.app.show_error(S.SRIM_READ_FAILED, "\n".join(errors))
         elif also:
-            self.app.toast(S.SRIM_ALSO_READ.format(name="、".join(also)))
+            self.app.toast(S.SRIM_ALSO_READ.format(name=S.LIST_SEP.join(also)))
 
     # ============================================================
     # 导出、代码、出版图

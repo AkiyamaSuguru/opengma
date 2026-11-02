@@ -932,7 +932,8 @@ class MethodView(TabView):
                 if not path:
                     return
                 path = Path(path).with_suffix(".xlsx")
-                await asyncio.to_thread(export_excel, records, path, project=self.project)
+                await asyncio.to_thread(export_excel, records, path, project=self.project, labels=S.EXPORT_LABELS,
+                                        note_text=importing.note_text)
                 self.app.toast(S.EXPORTED_EXCEL.format(path=path))
             else:
                 folder = await self.app.file_picker.get_directory_path(dialog_title=S.EXPORT_DATA)

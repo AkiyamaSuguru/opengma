@@ -25,7 +25,7 @@ CHOICES = {
     "export_format": ("xlsx", "csv"),
     "close_workspace": ("launcher", "quit"),
     "startup": ("launcher", "last_project"),
-    "language": ("zh",),
+    "language": ("zh", "en"),
 }
 
 

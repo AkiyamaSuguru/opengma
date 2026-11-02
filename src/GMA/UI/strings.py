@@ -1,12 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
 """
-界面上的全部文字。先只有中文；以后加英文时，按同样的名字再给一份即可。
+界面上的全部文字。中文写在下面的 S 中；英文写在 strings_en.py 的 EN 中，名字与 S 相同。
+
+启动时按设置调用 use(language)（GMA.UI.run() 中，在导入界面模块之前），之后 S 中就是所选语言的文字；
+界面模块在导入时就会读取 S（如默认参数、模块注册表），所以换语言要重新启动。
 
 只放文字，不放逻辑；带参数的句子写成 str.format 模板，例如 S.SELECTED_SAMPLES.format(n=1, total=3)。
-模块的名称和简介随模块定义放在 views/registry.py，主题色的名称放在 theme.py。
+中文和英文的标点、语序不同，拼接文字时也用这里的模板（如 S.LABELED、S.LIST_SEP），不在代码中写标点。
+英文的单复数写成 {n:file|files}：n 为 1 时用前一个词，否则用后一个（见 Text）。
 """
+import re
 from typing import ClassVar
+
+LANGUAGES = {"zh": "中文", "en": "English"}   # 设置中的界面语言：键 → 用这种语言写的名称
+_language = "zh"
 
 
 class S:
@@ -40,6 +48,13 @@ class S:
     REQUIRED = "不能为空"
     NUMBER_REQUIRED = "请输入数字"
     FILE_ERROR = "{name}：{error}"
+    LABELED = "{label}：{value}"         # 名称：内容
+    LIST_SEP = "、"                       # 并列的几项
+    GROUP_SEP = "；"                      # 并列的几组
+    VARIANT_SEP = " ／ "                   # 同一处的几种写法
+    TITLE_GAP = "　"                  # 加粗标题与正文之间
+    WITH_NOTE = "{text}（{note}）"         # 正文后面的括注
+    MONTHS: ClassVar[tuple[str, ...]] = ()  # 月份的名称（英文用 Jan、Feb…；中文直接写数字）
 
     # ---------- 启动器 ----------
     MODULES = "模块"
@@ -187,6 +202,8 @@ class S:
     IMPORT_FOLDER = "选择文件夹…"
     SEARCH = "搜索样品或谱图"
     FILTER_ALL = "全部"
+    FILTER_LINE = "谱线"
+    FILTER_FIT = "拟合谱"
     ONLY_SAMPLE = "只看 {sample}"
     SHOW_ALL_SAMPLES = "显示全部样品"
     NO_MATCH = "没有符合条件的谱图"
@@ -383,6 +400,17 @@ class S:
     NOTE_EMPTY_COMPONENT = "忽略空分峰列 {column}"
     NOTE_DUPLICATE_X = "{n} 个重复横轴值"
     NOTE_SORTED = "已按横轴排序"
+    NOTE_DROPPED_FULL = "去除 {n} 行空值或非数值数据（数据第 {rows} 行{more}）"
+    NOTE_MORE = "等"
+    NOTE_EMPTY_COMPONENT_FULL = "分峰列 {column} 中没有数值，已忽略"
+    NOTE_DUPLICATE_X_FULL = "横轴有 {n} 个重复的值，已保留"
+    NOTE_SORTED_FULL = "横轴不是单调的，已按横轴从小到大排列"
+    # 导出 Excel 时“信息”表的表名和列名（键见 GMA.project.exporters.INFO_LABELS）
+    EXPORT_LABELS: ClassVar[dict[str, str]] = {
+        "info_sheet": "信息", "sheet": "工作表", "sample": "样品", "method": "方法", "kind": "类型", "name": "名称",
+        "points": "点数", "components": "分峰", "component_mode": "分峰数据模式", "source": "来源文件",
+        "sha256": "SHA-256", "reader": "读取器", "imported_at": "导入时间", "gma_version": "GMA 版本",
+        "clean_notes": "清洗记录", "notes": "备注", "list_sep": "、", "note_sep": "；"}
     READ_FAILED = "无法读取：{reason}"
     IMPORT_HINT = "黄色为文件中的原名，可以现在改，也可以导入后在“分峰”面板改"
     IMPORT_N = "导入 {n} 个文件"
@@ -487,6 +515,13 @@ class S:
     RECENT_LIMIT = "最近项目数量"
     LANGUAGE = "界面语言"
     LANGUAGE_ZH = "中文"
+    LANGUAGE_RESTART = "重新启动 OpenGMA 后生效"
+    RESTART_NOW = "现在重新启动"
+    COLOR_TEAL = "青蓝"
+    COLOR_INDIGO = "墨蓝"
+    COLOR_PINE = "松绿"
+    COLOR_OCHRE = "赭石"
+    COLOR_GRAPHITE = "石墨"
     SETTINGS_SAVED_HINT = "设置保存在 {path}"
 
     # ---------- 计算工具：SRIM ----------
@@ -503,7 +538,6 @@ class S:
     SRIM_READ_FAILED = "无法读取 SRIM 文件"
     SRIM_NOT_SRIM = "{name} 不是能识别的 VACANCY.txt 或 RANGE.txt。"
     SRIM_MISMATCH = "RANGE.txt 与 VACANCY.txt 不是同一次计算（离子、能量或深度区间不同），没有计算注入浓度。"
-    SRIM_MOVED = "文件不在原来的位置时，把路径改成 {name} 现在的位置"
     FLUENCE = "注量"
     FLUENCE_DIRECT = "注量"
     FLUENCE_FLUX = "束流 × 时间"
@@ -530,7 +564,6 @@ class S:
     PEAK_VALUE = "峰值"
     AT_DEPTH = "所在深度"
     AVERAGE = "平均"
-    AVERAGE_RANGE = "深度范围（{unit}）"
     AVERAGE_END_HINT = "最深处"
     AVERAGE_RANGE_TIP = "留空表示从表面 / 到最深处；只覆盖深度区间的一部分时按覆盖的长度计入"
     VACANCIES_PER_ION = "每个离子产生的空位"
@@ -555,6 +588,12 @@ class S:
     INFO_VALUE = "值"
 
     # 复制为代码中的注释
+    CODE_PROJECT_FILE = "项目.nc"
+    CODE_HEADER_FIGURE = "OpenGMA 生成：复现出版图。可以粘贴到 marimo、Jupyter 或脚本中运行。"
+    CODE_NOT_SAVED = "项目还没有保存：先保存项目，再把 {file} 改成项目文件的路径。"
+    CODE_DIRTY = "代码读取的是项目文件中保存的数据；项目还有未保存的修改，请先保存。"
+    CODE_FONTS = "登记 OpenGMA 附带的字体：图中的中文用 {font} 显示，与预览相同"
+    CODE_SUBSTITUTED = "预览时本机没有 {font}，用了字宽相同的代替字体；在有这个字体的电脑上运行即可。"
     CODE_HEADER_SRIM = "OpenGMA 生成：SRIM 损伤（dpa）和注入离子浓度。可以粘贴到 marimo、Jupyter 或脚本中运行。"
     CODE_FLUX = "束流 ions/(cm²·s) × 时间（h）× 3600"
     CODE_PROFILE = "注量单位 ions/cm²；原子密度默认取文件头中的值"
@@ -614,3 +653,43 @@ class S:
     HOMEPAGE = "GitHub 仓库"
     ENVIRONMENT = "运行环境"
     COPY_ENVIRONMENT = "复制环境信息"
+
+
+_PLURAL = re.compile(r"\{(\w+):([^{}|]*)\|([^{}]*)\}")
+
+
+def _is_one(value) -> bool:
+    try:
+        return float(str(value).replace(" ", "").replace(",", "")) == 1
+    except ValueError:
+        return False
+
+
+class Text(str):
+    """带单复数的模板（英文）：format() 先把 {n:file|files} 换成 n 对应的单数或复数，再照常替换参数。"""
+
+    def format(self, *args, **kwargs) -> str:
+        def pick(m):
+            return m.group(2) if _is_one(kwargs.get(m.group(1))) else m.group(3)
+        return str.format(_PLURAL.sub(pick, self), *args, **kwargs)
+
+
+def use(language: str) -> str:
+    """
+    切换界面语言：language 为 LANGUAGES 中的键，不认识的语言用中文。返回实际使用的语言。
+    在导入界面模块之前调用（见 GMA.UI.run()）；运行中再换语言要重新启动。
+    """
+    global _language
+    if language == "en":
+        from .strings_en import EN
+        for name, value in EN.items():
+            if isinstance(value, str) and _PLURAL.search(value):
+                value = Text(value)
+            setattr(S, name, value)
+        _language = "en"
+    return _language
+
+
+def language() -> str:
+    """当前的界面语言。"""
+    return _language
