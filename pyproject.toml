@@ -19,9 +19,13 @@ dependencies = [
     "xarray>=2026.9.0",
 ]
 
+# 安装后在终端输入 opengma 启动图形界面（也可以 python -m GMA.UI）
+[project.scripts]
+opengma = "GMA.UI.app:run"
+
 # 让 uv sync 把 src/GMA 以可编辑模式装进环境，这样在任何位置都能 import GMA
 [build-system]
-requires = ["uv_build>=0.11.0,<0.12"]
+requires = ["uv_build>=0.11.0,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]

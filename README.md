@@ -41,6 +41,10 @@ src/GMA/
 │   ├── Raman/               # 结构同上：RamanLoader、RamanPlotter、RLoader/、RPlotter/
 │   └── XRD/                 # 结构同上：XRDLoader、XRDPlotter、DLoader/、DPlotter/
 ├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
+├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置
+│   ├── views/               # 工作区中的页面：项目总览、各模块页，以及模块注册表
+│   ├── components/          # 对话框和通用小部件
+│   └── assets/              # 图标、界面字体
 └── utils/
 tests/                       # 测试
 ```
@@ -61,6 +65,28 @@ uv sync
 
 ```bash
 uv run pytest
+```
+
+## 图形界面
+
+图形界面基于 [Flet](https://flet.dev/)，Windows、macOS、Linux 使用同一套代码。安装后运行：
+
+```bash
+uv run opengma            # 或者 uv run python -m GMA.UI
+```
+
+启动后先显示启动器：点击模块卡片新建项目，或者打开最近的项目。工作区按标签组织，固定在最左边的“项目”标签是项目总览，包括样品表（样品信息的字段由你定义，单击单元格编辑）、数据检查（导入时的清洗记录、各样品分峰名不一致）和导出（Excel / CSV）。各模块的页面（导入、谱图、分峰、出版图）正在开发中。
+
+- 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、窗口大小和最近项目。
+- 项目文件会保存界面状态（打开了哪些模块、停留在哪个标签），再次打开时恢复。
+- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+, 设置；macOS 上也可以用 ⌘。
+- Linux 上的文件对话框需要系统中装有 `zenity`。
+- 界面自带开源字体 Noto Sans SC（SIL Open Font License 1.1），Windows、macOS、Linux 上显示一致，不依赖系统中装有中文字体。
+
+想先看看界面，可以生成一个演示项目，再在启动器中用“打开项目…”打开它：
+
+```bash
+uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项目.nc（模拟数据）
 ```
 
 ## 快速上手
@@ -481,6 +507,7 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **Reserved: the author's name and personal information.** Jay Ma (AkiyamaSuguru) and any details about the author.
 - **Reserved: design.** The author's emblem in every form, all icons, and every logo, ornament, illustration and other design element, in whatever form and wherever it appears, including any added to this repository later.
 - **Reserved: content.** The text of this README and any other content that is not code, such as documents, images and data.
+- **Third-party fonts.** The fonts in `src/GMA/UI/assets/fonts/` (Noto Sans SC, © Adobe) are not the author's work and are not reserved. They are distributed under the SIL Open Font License 1.1; see the `OFL.txt` file in that folder.
 
 © 2026 Jay Ma. Everything the AGPL does not cover is reserved: **no use in any form** without written permission, commercial or not, including text and data mining and AI training. Fair use that the law allows (personal study, research, or a brief quotation that names its source) needs no permission; please keep within it. Keeping the copyright and license notices in the code, as the AGPL requires, needs none either.
 
@@ -492,5 +519,6 @@ If you build on the code, replace everything reserved with your own. To ask for 
 
 - **代码：[GNU AGPL-3.0](LICENSE)（`AGPL-3.0-only`），强 Copyleft 许可证**。包括 `src/` 中的 Python 包、`main.py`、`NoteBooks/` 中的笔记本以及项目文件。可以使用、研究、修改与分享；分享修改后的版本，或将其作为网络服务（例如网页应用或在线分析工具）运行时，必须以同一许可证向获得它或通过网络使用它的所有人提供全部源代码，保留版权与许可声明，并注明所作的修改。本软件不提供任何担保。
 - **保留**：作者的姓名与个人信息；作者徽标的一切形式、所有图标及其他一切设计元素（包括今后加入本仓库的）；本说明的文字以及其他非代码内容，如文档、图片与数据。
+- **第三方字体**：`src/GMA/UI/assets/fonts/` 中的字体（Noto Sans SC，© Adobe）不是作者的作品，不在保留之列，按 SIL Open Font License 1.1 分发，见该文件夹中的 `OFL.txt`。
 
 © 2026 Jay Ma。AGPL 不涵盖的一切均保留所有权利：未经书面许可，**禁止以任何形式使用**，无论商业或非商业用途，包括文本与数据挖掘及 AI 训练。法律允许的合理使用（个人学习、研究，或注明出处的适当引用）无需许可，请遵守这一界限；按 AGPL 的要求保留代码中的版权与许可声明，同样无需许可。如需许可，请通过[主页书信页](https://akiyamasuguru.github.io/?lang=zh#letter)上的地址或 GitHub（[@AkiyamaSuguru](https://github.com/AkiyamaSuguru)）联系作者。
