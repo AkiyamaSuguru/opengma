@@ -103,7 +103,7 @@ class SRIMOutput:
 
     @property
     def description(self) -> str:
-        """如“Xe 5400 keV → Layer 1（2000 nm）”。"""
+        """如“Ar 2000 keV → SiC (2000 nm)”。"""
         target = " / ".join(layer.name for layer in self.layers) or "target"
         return f"{self.ion} {self.energy:g} keV → {target} ({self.target_depth / 10:g} nm)"
 
