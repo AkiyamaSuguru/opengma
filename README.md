@@ -13,7 +13,7 @@ OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据�
 | 数据分析 | 常用表征方法的数据分析，基于已经拟合好的结果 | XPS 拟合质量与分峰指标已完成 |
 | 计算 | 通用以及专用的物理量计算 | 规划中 |
 | 结构化存储 | 把多个样品、多种表征方法的数据整理成一个项目文件（NetCDF），可导出 CSV / Excel | 已完成 |
-| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | 开发中 |
+| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | 启动器、工作区、项目总览和 XPS 模块已完成，Raman、XRD 开发中 |
 
 ## 设计哲学
 
@@ -42,9 +42,10 @@ src/GMA/
 │   └── XRD/                 # 结构同上：XRDLoader、XRDPlotter、DLoader/、DPlotter/
 ├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
 ├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置
-│   ├── views/               # 工作区中的页面：项目总览、各模块页，以及模块注册表
-│   ├── components/          # 对话框和通用小部件
-│   └── assets/              # 图标、界面字体
+│   ├── views/               # 工作区中的页面：项目总览、各模块页（三栏模板），以及模块注册表
+│   ├── components/          # 交互图、导入和出版图等对话框、通用小部件
+│   ├── services/            # 不依赖界面的部分：曲线整理、出版图、复制为代码、分析、导入
+│   └── assets/              # 图标、随应用附带的开源字体
 └── utils/
 tests/                       # 测试
 ```
@@ -75,13 +76,22 @@ uv run pytest
 uv run opengma            # 或者 uv run python -m GMA.UI
 ```
 
-启动后先显示启动器：点击模块卡片新建项目，或者打开最近的项目。工作区按标签组织，固定在最左边的“项目”标签是项目总览，包括样品表（样品信息的字段由你定义，单击单元格编辑）、数据检查（导入时的清洗记录、各样品分峰名不一致）和导出（Excel / CSV）。各模块的页面（导入、谱图、分峰、出版图）正在开发中。
+启动后先显示启动器：点击模块卡片新建项目，或者打开最近的项目。工作区按标签组织，固定在最左边的“项目”标签是项目总览，包括样品表（样品信息的字段由你定义，单击单元格编辑）、数据检查（导入时的清洗记录、各样品分峰名不一致）和导出（Excel / CSV）。
+
+**XPS 模块**分三栏：
+
+- **左栏：数据**。导入文件或整个文件夹（文件夹名作样品名、文件名作谱图名），导入前在对话框中确认识别结果（全谱 / 元素谱）、分峰名和清洗报告；谱图按样品分组，可以搜索、筛选，单击查看，勾选后叠加或并排。
+- **中间：交互图和数据表**。悬停显示读数；滚轮或双指上下滑缩放，拖动或双指左右滑平移，双击复位；点击图例隐藏曲线；横轴按 XPS 习惯从高到低。默认显示全部数据点，不抽稀（可以在设置中打开）。视图有单谱、叠加（可以归一化、错开）和并排。下方的数据表可以看前 30 行、后 30 行或全部。
+- **右栏：检查器**。“显示”中修改分峰名和颜色、分峰数据模式、坐标范围，并可以应用到其他样品的同名谱图；“分析”中是拟合质量（R²、RMSE、MAE）和各分峰的峰位、峰高、面积、面积占比（不是原子百分比），可以复制或导出；“信息”中是来源文件、读取器、导入时间、文件哈希和清洗报告。
+- **出版图**：用 GMA 的出版图函数生成，预览就是导出的效果；可以调尺寸、字体、字号、图例、分峰填充等，导出 PNG、SVG、PDF、TIFF、JPG，或交互 HTML。“复制为代码”生成一段 GMA 代码，粘贴到 marimo 中就能得到同样的图。
+
+Raman、XRD 模块使用同一模板，正在开发中。
 
 - 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、窗口大小和最近项目。
 - 项目文件会保存界面状态（打开了哪些模块、停留在哪个标签），再次打开时恢复。
-- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+, 设置；macOS 上也可以用 ⌘。
+- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+I 导入，Ctrl+E 出版图，Ctrl+, 设置；macOS 上也可以用 ⌘。
 - Linux 上的文件对话框需要系统中装有 `zenity`。
-- 界面自带开源字体 Noto Sans SC（SIL Open Font License 1.1），Windows、macOS、Linux 上显示一致，不依赖系统中装有中文字体。
+- 界面自带开源字体 Noto Sans SC（SIL Open Font License 1.1），Windows、macOS、Linux 上显示一致，不依赖系统中装有中文字体。出版图默认用 Times New Roman，系统中没有时用附带的、字宽相同的 Liberation Serif 代替（Arial 用 Liberation Sans 代替），图中的中文用 Noto Sans SC。
 
 想先看看界面，可以生成一个演示项目，再在启动器中用“打开项目…”打开它：
 
@@ -496,7 +506,7 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **Raman**：读取（Horiba LabRAM HR Evolution 导出的 txt）和绘图已完成。
 - **XRD**：读取（Bruker D8 Advance 导出的 txt）和绘图已完成。
 - **结构化存储**：项目文件（NetCDF）、导入与清洗记录、CSV / Excel 导出已完成。
-- **UI**：开发中。
+- **UI**：启动器、工作区、项目总览和 XPS 模块已完成，Raman、XRD 模块开发中。
 - **其他表征方法的分析、计算**：规划中。
 
 ## License
@@ -507,7 +517,7 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **Reserved: the author's name and personal information.** Jay Ma (AkiyamaSuguru) and any details about the author.
 - **Reserved: design.** The author's emblem in every form, all icons, and every logo, ornament, illustration and other design element, in whatever form and wherever it appears, including any added to this repository later.
 - **Reserved: content.** The text of this README and any other content that is not code, such as documents, images and data.
-- **Third-party fonts.** The fonts in `src/GMA/UI/assets/fonts/` (Noto Sans SC, © Adobe) are not the author's work and are not reserved. They are distributed under the SIL Open Font License 1.1; see the `OFL.txt` file in that folder.
+- **Third-party fonts.** The fonts in `src/GMA/UI/assets/fonts/` (Noto Sans SC, © Adobe; Liberation Serif and Liberation Sans, © Google and Red Hat) are not the author's work and are not reserved. They are distributed under the SIL Open Font License 1.1; see the license files and `README.md` in that folder.
 
 © 2026 Jay Ma. Everything the AGPL does not cover is reserved: **no use in any form** without written permission, commercial or not, including text and data mining and AI training. Fair use that the law allows (personal study, research, or a brief quotation that names its source) needs no permission; please keep within it. Keeping the copyright and license notices in the code, as the AGPL requires, needs none either.
 
@@ -519,6 +529,6 @@ If you build on the code, replace everything reserved with your own. To ask for 
 
 - **代码：[GNU AGPL-3.0](LICENSE)（`AGPL-3.0-only`），强 Copyleft 许可证**。包括 `src/` 中的 Python 包、`main.py`、`NoteBooks/` 中的笔记本以及项目文件。可以使用、研究、修改与分享；分享修改后的版本，或将其作为网络服务（例如网页应用或在线分析工具）运行时，必须以同一许可证向获得它或通过网络使用它的所有人提供全部源代码，保留版权与许可声明，并注明所作的修改。本软件不提供任何担保。
 - **保留**：作者的姓名与个人信息；作者徽标的一切形式、所有图标及其他一切设计元素（包括今后加入本仓库的）；本说明的文字以及其他非代码内容，如文档、图片与数据。
-- **第三方字体**：`src/GMA/UI/assets/fonts/` 中的字体（Noto Sans SC，© Adobe）不是作者的作品，不在保留之列，按 SIL Open Font License 1.1 分发，见该文件夹中的 `OFL.txt`。
+- **第三方字体**：`src/GMA/UI/assets/fonts/` 中的字体（Noto Sans SC，© Adobe；Liberation Serif、Liberation Sans，© Google、Red Hat）不是作者的作品，不在保留之列，按 SIL Open Font License 1.1 分发，见该文件夹中的许可证文件和 `README.md`。
 
 © 2026 Jay Ma。AGPL 不涵盖的一切均保留所有权利：未经书面许可，**禁止以任何形式使用**，无论商业或非商业用途，包括文本与数据挖掘及 AI 训练。法律允许的合理使用（个人学习、研究，或注明出处的适当引用）无需许可，请遵守这一界限；按 AGPL 的要求保留代码中的版权与许可声明，同样无需许可。如需许可，请通过[主页书信页](https://akiyamasuguru.github.io/?lang=zh#letter)上的地址或 GitHub（[@AkiyamaSuguru](https://github.com/AkiyamaSuguru)）联系作者。

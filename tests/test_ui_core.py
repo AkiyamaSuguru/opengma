@@ -78,7 +78,7 @@ def test_session_save_and_reopen(tmp_path, c1s):
     session = ProjectSession()
     assert session.name == S.UNTITLED and session.path is None and not session.dirty
     events = []
-    session.subscribe(events.append)
+    session.subscribe(lambda kind, source: events.append(kind))
     session.project.add_record(Record.from_dataframe(c1s, "XPS", "C1s", "B1"))
     assert session.dirty
     ui_state = make_ui_state([{"module": "xps", "state": {}}], 1)

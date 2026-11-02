@@ -400,6 +400,18 @@ test = [
 ]
 
 [[package]]
+name = "flet-charts"
+version = "1.0.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flet" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/84/9b07b18c7749767855e9592b4d98c790016081499b2c9832490489cca536/flet_charts-1.0.5.tar.gz", hash = "sha256:d08bff2a86f9851b4a3ff8eda9e635b79445158208cb76681781dcd626e081ea", size = 55857, upload-time = "2026-10-21T20:43:47.84Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/cf/b0abf12ee4ae0a15dbfea79dd0683f04a241998076e82400ac7bbfa77146/flet_charts-1.0.5-py3-none-any.whl", hash = "sha256:b222e2992b5be47f25155968d8241dc3f5ab7434e0153fb6dcd4df7b9f6eaf7b", size = 75421, upload-time = "2026-10-21T20:43:46.88Z" },
+]
+
+[[package]]
 name = "flet-cli"
 version = "1.0.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1172,6 +1184,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "flet" },
+    { name = "flet-charts" },
     { name = "h5netcdf", extra = ["h5py"] },
     { name = "marimo" },
     { name = "matplotlib" },
@@ -1195,6 +1208,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flet", specifier = ">=1.0.5" },
+    { name = "flet-charts", specifier = ">=1.0.5" },
     { name = "h5netcdf", extras = ["h5py"], specifier = ">=1.8.2" },
     { name = "marimo", specifier = ">=0.23.16" },
     { name = "matplotlib", specifier = ">=3.11.2" },

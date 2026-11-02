@@ -14,21 +14,26 @@ import flet as ft
 
 from . import theme as th
 from .components import widgets as w
+from .components.dialogs import close, show
 from .services.text import short_path
 from .session import ProjectSession, make_ui_state
 from .strings import S
 from .views import registry
+from .views.base import TabView
 from .views.module_view import ModuleView
 from .views.overview_view import OverviewView
 from .views.registry import ModuleSpec
+from .views.xps_view import XPSView
 
 TAB_H, STRIP_H = 34, 42
+# 已经实现的模块页；其余模块（Raman、XRD 在 P4 中实现）先用占位页
+VIEW_CLASSES = {"xps": XPSView}
 
 
 @dataclass
 class ModuleTab:
     spec: ModuleSpec
-    view: ModuleView
+    view: TabView
     number: int = 1   # 同一模块的第几个标签
 
     @property
@@ -49,6 +54,7 @@ class Workspace:
         self.active = active if 0 <= active <= len(self.tabs) else 0
         self.status = S.READY
         self.selection_text = ""
+        self.readout: ft.Text | None = None   # 交互图的悬停读数
         self.body: ft.Container | None = None
         self.strip: ft.Container | None = None
         self.status_bar: ft.Container | None = None
@@ -60,14 +66,26 @@ class Workspace:
     def _add(self, spec: ModuleSpec, state: dict) -> ModuleTab:
         used = {t.number for t in self.tabs if t.spec.key == spec.key}
         number = next(n for n in range(1, len(used) + 2) if n not in used)
-        tab = ModuleTab(spec, ModuleView(self.app, self.session, self, spec, state), number)
+        view_class = VIEW_CLASSES.get(spec.key, ModuleView)
+        tab = ModuleTab(spec, view_class(self.app, self.session, self, spec, state), number)
         self.tabs.append(tab)
         return tab
 
-    def open_module(self, key: str, state: dict | None = None) -> None:
+    def open_module(self, key: str, state: dict | None = None, *, reuse: bool = False) -> None:
+        """
+        打开模块标签。reuse=True（如从项目总览点击某个样品的数据量）时，已经打开的同一模块标签直接切过去，
+        并按 state 只显示对应样品；否则新开一个标签（同一模块可以开多个）。
+        """
         spec = registry.get(key)
         if spec is None or spec.planned:
             return
+        if reuse:
+            for index, tab in enumerate(self.tabs, start=1):
+                if tab.spec.key == key:
+                    if state and hasattr(tab.view, "open_with"):
+                        tab.view.open_with(state)
+                    self.select(index)
+                    return
         self._add(spec, state or {})
         self.select(len(self.tabs))
 
@@ -84,6 +102,7 @@ class Workspace:
 
     def select(self, index: int) -> None:
         self.active = max(0, min(index, len(self.tabs)))
+        self.status = S.READY
         self.refresh()
 
     def module_keys(self) -> list[str]:
@@ -107,6 +126,8 @@ class Workspace:
                                   border=ft.Border.only(bottom=ft.BorderSide(1, p.border)),
                                   padding=ft.Padding.only(left=8, right=8))
         self.body = ft.Container(content=self.current_view().control(), expand=True, bgcolor=p.bg)
+        self.readout = ft.Text("", size=th.SIZE_TINY, color=p.text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS,
+                               expand=True)
         self.status_bar = ft.Container(height=26, content=self.status_row(), bgcolor=p.panel,
                                        border=ft.Border.only(top=ft.BorderSide(1, p.border)),
                                        padding=ft.Padding.symmetric(horizontal=12))
@@ -121,6 +142,8 @@ class Workspace:
             return
         self.strip.content = self.strip_row()
         self.body.content = self.current_view().control()
+        if self.readout is not None:
+            self.readout.value = ""
         self.status_bar.content = self.status_row()
         self.app.page.title = self.app.window_title()
         self.app.page.update()
@@ -264,31 +287,49 @@ class Workspace:
         else:
             state, color = S.SAVED, p.success
         location = short_path(self.session.path) if self.session.path else ""
+        view = self.current_view()
+        self.selection_text = view.selection() if hasattr(view, "selection") else ""
         return ft.Row([
             w.muted(self.status, p, th.SIZE_TINY),
             *([w.vsep(p, 12), w.muted(self.selection_text, p, th.SIZE_TINY)] if self.selection_text else []),
-            ft.Container(expand=True),
+            ft.Container(width=8),
+            self.readout if self.readout is not None else ft.Container(expand=True),
             w.faint(location, p, th.SIZE_TINY, max_lines=1, tooltip=str(self.session.path or "")),
             w.dot(color, 6), w.muted(state, p, th.SIZE_TINY),
         ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
-    def set_status(self, text: str | None = None, selection: str | None = None) -> None:
+    def set_status(self, text: str | None = None) -> None:
+        """状态栏左侧的状态文字；选择（如“已选 2 / 6 条谱图”）由当前标签的 selection() 给出。"""
         if text is not None:
             self.status = text
-        if selection is not None:
-            self.selection_text = selection
         if self.status_bar is not None:
             self.status_bar.content = self.status_row()
             self.status_bar.update()
 
+    def set_readout(self, text: str) -> None:
+        """交互图的悬停读数：只更新这一段文字，不重画状态栏（悬停时调用得很频繁）。"""
+        if self.readout is None or self.readout.value == text:
+            return
+        self.readout.value = text
+        self.readout.update()
+
     # ============================================================
     # 事件
     # ============================================================
-    def on_session_change(self, kind: str) -> None:
-        if kind in ("data", "renamed", "saved"):
-            self.overview.invalidate()
-            for t in self.tabs:
-                t.view.invalidate()
+    def on_session_change(self, kind: str, source=None) -> None:
+        """
+        项目变了：需要重画的标签标记为过期，切换到它时重新生成。数据变了时所有标签都要重画；
+        保存、改项目名只影响项目总览（文件路径、项目名）。发起修改的标签自己已经刷新过，不再重画。
+        """
+        if kind == "data":
+            views = [self.overview, *(t.view for t in self.tabs)]
+        elif kind in ("renamed", "saved"):
+            views = [self.overview]
+        else:
+            views = []
+        for view in views:
+            if view is not source:
+                view.invalidate()
         if kind == "saved":
             self.status = S.SAVED
         self.refresh()
@@ -306,23 +347,26 @@ class Workspace:
             self.select((self.active + (-1 if shift else 1)) % count)
         elif key == "t":
             self.ask_open_module()
-        elif key in ("i", "e"):
-            self.app.not_yet("P3")
+        elif key in ("i", "e"):  # 导入、出版图：交给当前的模块标签
+            handler = getattr(self.current_view(), "on_shortcut", None)
+            if handler is None or not await handler(key, shift):
+                self.app.toast(S.SHORTCUT_IN_MODULE)
 
     def ask_open_module(self) -> None:
         """Ctrl+T：列出可以打开的模块。"""
         p, page = self.app.p, self.app.page
 
         def choose(key):
-            page.pop_dialog()
+            close(box)
             self.open_module(key)
 
         buttons = [w.hoverable(ft.Row([w.module_tile(m, p.dark, 30, 18), w.text(m.title, p, 14, bold=True)],
                                       spacing=12), p, on_click=lambda e, k=m.key: choose(k),
                                padding=ft.Padding.symmetric(horizontal=10, vertical=8))
                    for m in registry.available()]
-        page.show_dialog(ft.AlertDialog(
+        box = ft.AlertDialog(
             bgcolor=p.panel, shape=ft.RoundedRectangleBorder(radius=th.RADIUS_PANEL),
             title=ft.Text(S.NEW_TAB, size=16, weight=ft.FontWeight.W_600, color=p.text),
             content=ft.Container(width=280, content=ft.Column(buttons, spacing=2, tight=True)),
-            actions=[ft.TextButton(S.CANCEL, on_click=lambda e: page.pop_dialog())]))
+            actions=[ft.TextButton(S.CANCEL, on_click=lambda e: close(box))])
+        show(page, box)

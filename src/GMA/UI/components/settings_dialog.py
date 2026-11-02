@@ -13,9 +13,11 @@ from ...CM.Raman.loader import READERS as RAMAN_READERS
 from ...CM.XPS.loader import READERS as XPS_READERS
 from ...CM.XRD.loader import READERS as XRD_READERS
 from .. import theme as th
+from ..services.figures import FIGURE_FONTS
 from ..services.text import short_path
 from ..strings import S
 from . import widgets as w
+from .dialogs import close, show
 
 READERS = {"XPS": list(XPS_READERS), "Raman": list(RAMAN_READERS), "XRD": list(XRD_READERS)}
 CATEGORIES = [("appearance", S.SETTINGS_APPEARANCE, ft.Icons.PALETTE_OUTLINED),
@@ -23,7 +25,7 @@ CATEGORIES = [("appearance", S.SETTINGS_APPEARANCE, ft.Icons.PALETTE_OUTLINED),
               ("plot", S.SETTINGS_PLOT, ft.Icons.SHOW_CHART_ROUNDED),
               ("data", S.SETTINGS_DATA, ft.Icons.DATASET_OUTLINED),
               ("general", S.SETTINGS_GENERAL, ft.Icons.TUNE_ROUNDED)]
-FONTS = ["Times New Roman", "Arial", "Helvetica", "DejaVu Serif", "DejaVu Sans", "Liberation Serif"]
+FONTS = list(FIGURE_FONTS)
 COLOR_CYCLES = ["tab10", "tab20", "Set1", "Set2", "Dark2", "Paired"]
 
 
@@ -46,9 +48,9 @@ class SettingsDialog:
                 [self.nav, w.vsep(p, 400), self.right], spacing=16, vertical_alignment=ft.CrossAxisAlignment.START)),
             actions=[ft.Row([w.faint(S.SETTINGS_SAVED_HINT.format(path=short_path(self.app.settings_file)), p),
                              ft.Container(expand=True),
-                             ft.FilledButton(S.CLOSE, on_click=lambda e: page.pop_dialog())])],
+                             ft.FilledButton(S.CLOSE, on_click=lambda e: close(self.dialog))])],
         )
-        page.show_dialog(self.dialog)
+        show(page, self.dialog)
 
     # ============================================================
     # 结构
@@ -79,7 +81,7 @@ class SettingsDialog:
         self.app.save_settings()
         if theme:
             self.app.apply_theme()
-            self.app.page.pop_dialog()
+            close(self.dialog)
             self.show()
 
     # ---------- 小部件 ----------

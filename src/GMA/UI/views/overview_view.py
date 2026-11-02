@@ -164,7 +164,8 @@ class OverviewView(TabView):
             cells.append(ft.Container(
                 content=text, width=COL_COUNT, alignment=ft.Alignment.CENTER_RIGHT,
                 padding=ft.Padding.symmetric(horizontal=6),
-                on_click=(lambda e, k=m.key, s=name: self.workspace.open_module(k, {"sample": s})) if n else None,
+                on_click=(lambda e, k=m.key, s=name: self.workspace.open_module(k, {"sample": s}, reuse=True))
+                if n else None,
                 tooltip=S.OPEN_IN_MODULE.format(title=m.title, sample=name) if n else None))
         cells.append(ft.Container(width=COL_MENU, content=ft.PopupMenuButton(
             icon=ft.Icons.MORE_HORIZ_ROUNDED, icon_size=18, icon_color=p.faint, items=[
@@ -319,11 +320,12 @@ class OverviewView(TabView):
         self.selected = set(self.project.samples) if e.control.value else set()
         self.after_selection()
 
-    def after_selection(self) -> None:
-        total = len(self.project.samples)
+    def selection(self) -> str:
         n = len(self.selected)
-        self.export_scope = "selected" if n else "all"
-        self.workspace.selection_text = S.SELECTED_SAMPLES.format(n=n, total=total) if n else ""
+        return S.SELECTED_SAMPLES.format(n=n, total=len(self.project.samples)) if n else ""
+
+    def after_selection(self) -> None:
+        self.export_scope = "selected" if self.selected else "all"
         self.redraw()
         self.workspace.set_status()
 
