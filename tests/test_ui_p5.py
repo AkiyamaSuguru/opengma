@@ -314,3 +314,68 @@ def test_english_startup(tmp_path):
     result = subprocess.run([sys.executable, "-c", code], env={**os.environ, "OPENGMA_HOME": str(tmp_path)},
                             capture_output=True, text=True, timeout=120, check=False)
     assert result.returncode == 0 and result.stdout.strip().endswith("ok"), result.stderr
+
+
+# ============================================================
+# 打包
+# ============================================================
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def build_script():
+    """scripts/build_app.py 不是包的一部分，按文件导入。"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_app", ROOT / "scripts" / "build_app.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_packaging_config():
+    """flet build 的入口和依赖：入口文件存在；打包的依赖只有运行需要的（不含 marimo 和开发工具）；应用图标齐全。"""
+    import tomllib
+
+    from PIL import Image
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    app = data["tool"]["flet"]["app"]
+    assert (ROOT / app["path"] / f"{app['module']}.py").is_file()
+    names = {re.split(r"[<>=\[ ;]", d, maxsplit=1)[0] for d in data["project"]["dependencies"]}
+    assert {"flet", "flet-charts", "numpy", "h5netcdf"} <= names
+    assert not names & {"marimo", "flet-cli", "flet-desktop", "flet-web", "pytest"}
+    assets = ROOT / "src" / "GMA" / "UI" / "assets"
+    for name in ("icon.png", "icon_macos.png"):
+        image = Image.open(assets / name)
+        assert image.size == (1024, 1024) and image.mode == "RGBA" and image.getpixel((0, 0))[3] == 0
+    assert build_script().artifact_name() == data["tool"]["flet"]["artifact"] == "OpenGMA"
+
+
+def test_smoke_checks():
+    """打包后的自检在源码环境中也能通过（GitHub Actions 中在打包好的程序里运行同样的检查）。"""
+    from GMA.UI.services import smoke
+    result = smoke.run_checks()
+    assert result["ok"], result
+    assert set(result["checks"]) == {"project", "excel", "figure", "srim", "salt"}
+
+
+def test_build_script_finds_program(tmp_path, monkeypatch):
+    """自检时找到打包好的程序：Linux 的可执行文件、Windows 的 .exe、Mac 的 .app（按 Info.plist）。"""
+    import plistlib
+    script = build_script()
+    monkeypatch.setattr(script, "output_dir", lambda target: tmp_path / "build" / target)
+    linux = tmp_path / "build" / "linux"
+    (linux / "lib").mkdir(parents=True)
+    (linux / "lib" / "libapp.so").write_bytes(b"")
+    program = linux / "OpenGMA"
+    program.write_bytes(b"")
+    program.chmod(0o755)
+    assert script.executable("linux") == program
+    windows = tmp_path / "build" / "windows"
+    windows.mkdir(parents=True)
+    (windows / "flutter_windows.dll").write_bytes(b"")
+    (windows / "OpenGMA.exe").write_bytes(b"")
+    assert script.executable("windows") == windows / "OpenGMA.exe"
+    bundle = tmp_path / "build" / "macos" / "OpenGMA.app" / "Contents"
+    (bundle / "MacOS").mkdir(parents=True)
+    with open(bundle / "Info.plist", "wb") as f:
+        plistlib.dump({"CFBundleExecutable": "OpenGMA"}, f)
+    assert script.executable("macos") == bundle / "MacOS" / "OpenGMA"

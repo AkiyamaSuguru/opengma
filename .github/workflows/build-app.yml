@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: 2026 Jay Ma
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# 打包 OpenGMA 图形界面：macOS、Windows、Linux 各打一个包（未签名），上传为本次运行的附件（Artifacts），
+# 然后运行打包好的程序做一次自检（程序用自己带的 Python，不用电脑上安装的 Python）。
+#
+# 运行方式：
+# - 手动：GitHub 网页 → Actions → Build desktop app → Run workflow；
+# - 打标签：git tag v0.2.0 && git push origin v0.2.0；
+# - 修改打包相关的文件（本文件、scripts/build_app.py、src/main.py、自检）的 PR 也会运行，检查打包是否还能用。
+# 本机打包用同一个脚本，见 README 的“打包”一节。
+
+name: Build desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/build-app.yml"
+      - "scripts/build_app.py"
+      - "src/main.py"
+      - "src/GMA/UI/services/smoke.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos
+            runner: macos-latest
+          - target: windows
+            runner: windows-latest
+          - target: linux
+            runner: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: "1"
+      FLET_CLI_NO_RICH_OUTPUT: "1"
+      UV_NO_GROUP: notebook   # 打包不需要 marimo
+      UV_LOCKED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install flet-cli and the project
+        run: uv sync
+
+      - name: Read the Flutter version
+        id: flet
+        run: |
+          uv run flet --version --json > flet-version.json
+          uv run python -c "import json; d = json.load(open('flet-version.json')); print('flutter=' + d['flutter']); print('linux-deps=' + ' '.join(d['linux_dependencies']))" >> "$GITHUB_OUTPUT"
+          rm flet-version.json
+
+      - name: Cache the Flutter SDK
+        uses: actions/cache@v6
+        with:
+          path: ~/flutter/${{ steps.flet.outputs.flutter }}
+          key: flutter-${{ runner.os }}-${{ runner.arch }}-${{ steps.flet.outputs.flutter }}
+
+      - name: Install Linux build tools
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update --allow-releaseinfo-change
+          sudo apt-get install -y --no-install-recommends ${{ steps.flet.outputs.linux-deps }} xvfb
+          sudo apt-get clean
+
+      - name: Build
+        id: build
+        run: uv run python scripts/build_app.py build ${{ matrix.target }} --build-number ${{ github.run_number }}
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.build.outputs.archive }}
+          archive: false
+          if-no-files-found: error
+
+      - name: Smoke test
+        run: |
+          if [ "${{ matrix.target }}" = linux ]; then
+            xvfb-run -a uv run python scripts/build_app.py smoke linux
+          else
+            uv run python scripts/build_app.py smoke ${{ matrix.target }}
+          fi

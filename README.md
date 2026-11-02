@@ -11,9 +11,9 @@ OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据�
 | 数据读取 | 读取不同仪器导出的数据，统一转换为标准数据结构 | XPS、Raman、XRD 已完成 |
 | 绘图 | 学术出版图（matplotlib）和交互图（plotly） | XPS、Raman、XRD 已完成 |
 | 数据分析 | 常用表征方法的数据分析，基于已经拟合好的结果 | XPS 拟合质量与分峰指标已完成 |
-| 计算 | 通用以及专用的物理量计算 | 规划中 |
+| 计算 | 通用以及专用的物理量计算 | SRIM 损伤（dpa）与注入离子浓度、熔盐配比已完成 |
 | 结构化存储 | 把多个样品、多种表征方法的数据整理成一个项目文件（NetCDF），可导出 CSV / Excel | 已完成 |
-| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | 启动器、工作区、项目总览，以及 XPS、Raman、XRD 模块已完成 |
+| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | XPS、Raman、XRD 和计算工具模块、中英文界面、自动备份、打包已完成 |
 
 ## 设计哲学
 
@@ -40,13 +40,18 @@ src/GMA/
 │   │   └── XPlotter/        # 各种图的实现，以及 XPS 定制色表
 │   ├── Raman/               # 结构同上：RamanLoader、RamanPlotter、RLoader/、RPlotter/
 │   └── XRD/                 # 结构同上：XRDLoader、XRDPlotter、DLoader/、DPlotter/
+├── SC/                      # 模拟与计算（Simulation & Calculation）
+│   ├── SRIM/                # 读取 TRIM 的 VACANCY.txt、RANGE.txt，计算 dpa 和注入离子浓度
+│   └── Salts/               # 熔盐配比：按摩尔分数和总质量计算各盐的质量
 ├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
-├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置
+├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置；strings.py、strings_en.py 是中英文界面文字
 │   ├── views/               # 工作区中的页面：项目总览、各模块页（三栏模板），以及模块注册表
 │   ├── components/          # 交互图、导入和出版图等对话框、通用小部件
 │   ├── services/            # 不依赖界面的部分：曲线整理、出版图、复制为代码、分析、导入
 │   └── assets/              # 图标、随应用附带的开源字体
 └── utils/
+src/main.py                  # 打包（flet build）时的程序入口
+scripts/build_app.py         # 打包脚本，本机和 GitHub Actions 共用
 tests/                       # 测试
 ```
 
@@ -62,7 +67,7 @@ cd opengma
 uv sync
 ```
 
-`uv sync` 会安装所有依赖，并以可编辑模式安装 `GMA`，之后在任何位置都可以 `import GMA`。运行测试：
+`uv sync` 会安装所有依赖，并以可编辑模式安装 `GMA`，之后在任何位置都可以 `import GMA`。marimo 在 `notebook` 依赖组中，`uv sync` 默认也会安装；它不是 GMA 的运行依赖，所以不会打包进图形界面程序。运行测试：
 
 ```bash
 uv run pytest
@@ -86,10 +91,18 @@ XPS、Raman、XRD 三个模块使用同一个三栏页面：
 - **峰位表、参考物相**：由你填写，保存在项目中，各模块共用，也可以导入导出 CSV；GMA 不内置任何峰位或物相。
 - **出版图**：用 GMA 的出版图函数生成，预览就是导出的效果；可以调尺寸、字体、字号、图例、分峰填充等，导出 PNG、SVG、PDF、TIFF、JPG，或交互 HTML。“复制为代码”生成一段 GMA 代码，粘贴到 marimo 中就能得到同样的图。
 
+计算工具也在工作区中，以标签的形式打开，输入随项目保存：
 
-- 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、窗口大小和最近项目。
+- **SRIM · dpa**：选择 TRIM 输出的 VACANCY.txt 和 / 或 RANGE.txt（按内容识别，同一文件夹中的另一个文件也会一起读），Quick K-P 和 Full Cascade 都可以，多层靶各层用自己的原子密度。输入注量，或束流 × 时间；原子密度取自文件头，可以修改。图中是 dpa 或注入离子浓度随深度的分布（Full Cascade 还可以按元素显示），右侧是峰值、所在深度、指定深度范围内的平均值、平均射程和留在靶中的离子比例。可以导出 Excel / CSV、复制为代码、生成出版图。文件内容保存在项目中，换一台电脑打开项目也能看到。
+- **熔盐配比**：从内置的组成（FLiNaK、FLiBe、NaCl-KCl、LiCl-KCl、NaCl-MgCl2、KCl-MgCl2）开始，可以修改、保存为自己的预设，也可以恢复内置的预设（保存在设置中）。按摩尔分数（或任意比例）和总质量算出每种盐的质量；摩尔质量按化学式和 IUPAC 标准原子量计算，同位素富集的盐（如 ⁷LiF）可以直接填写摩尔质量。结果可以复制成表格粘贴到 Excel 或实验记录中，也可以导出或复制为代码。
+
+- 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、界面语言、窗口大小和最近项目。
+- **界面语言**：设置 → 常规 → 界面语言，中文或 English，重新启动后生效（设置中可以直接重新启动）。
 - 项目文件会保存界面状态（打开了哪些模块、停留在哪个标签），再次打开时恢复。
-- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+I 导入，Ctrl+E 出版图，Ctrl+, 设置；macOS 上也可以用 ⌘。
+- **自动备份**：有未保存的修改时，每 5 分钟把项目写一份到 `~/.opengma/autosave`；保存或正常关闭后删除。程序意外退出后再启动时，启动器会列出这些备份，可以打开或删除。
+- **项目锁**：打开项目时在项目文件旁边写一个锁文件（`.项目名.nc.lock`）。另一个窗口（或另一台电脑通过共享文件夹）再打开同一个项目时，会提示以只读方式打开；只读打开的项目只能另存为新文件。
+- **新建窗口**：Ctrl+Shift+N，或启动器、项目菜单中的“新建窗口”，再开一个 OpenGMA 窗口。
+- 快捷键：Ctrl+S 保存，Ctrl+Shift+S 另存为，Ctrl+O 打开，Ctrl+Shift+N 新建窗口，Ctrl+T 打开模块，Ctrl+W 关闭标签，Ctrl+Tab 切换标签，Ctrl+I 导入，Ctrl+E 出版图，Ctrl+, 设置；macOS 上也可以用 ⌘。
 - Linux 上的文件对话框需要系统中装有 `zenity`。
 - 界面自带开源字体 Noto Sans SC（SIL Open Font License 1.1），Windows、macOS、Linux 上显示一致，不依赖系统中装有中文字体。出版图默认用 Times New Roman，系统中没有时用附带的、字宽相同的 Liberation Serif 代替（Arial 用 Liberation Sans 代替），图中的中文用 Noto Sans SC。
 
@@ -98,6 +111,40 @@ XPS、Raman、XRD 三个模块使用同一个三栏页面：
 ```bash
 uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项目.nc（模拟数据）
 ```
+
+## 打包
+
+图形界面可以用 [flet build](https://flet.dev/docs/publish) 打包成不需要安装 Python 的程序：程序里带着自己的 Python 和全部依赖，Mac 上是 `OpenGMA.app`，Windows 上是带 `OpenGMA.exe` 的文件夹，Linux 上是带 `OpenGMA` 可执行文件的文件夹。设置、自动备份仍然在 `~/.opengma`，与从源码运行时相同。打包只能在对应的系统上进行（Mac 上打 Mac 的包，以此类推），三个系统用同一个脚本 `scripts/build_app.py`。
+
+### 在自己的电脑上打包（以 Mac 为例）
+
+1. 准备工具：从 App Store 安装 Xcode（15 及以上），打开一次并同意许可；安装 CocoaPods 1.16 及以上（`brew install cocoapods`）；Apple 芯片的 Mac 还需要 Rosetta：`sudo softwareupdate --install-rosetta --agree-to-license`。
+2. 在项目文件夹中运行：
+
+   ```bash
+   uv sync
+   uv run python scripts/build_app.py build macos
+   ```
+
+   第一次打包时 flet 会自动下载 Flutter SDK（放在 `~/flutter`），需要一段时间；之后再打包会快很多。
+3. 得到 `build/macos/OpenGMA.app`，以及压缩好的 `dist/OpenGMA-<版本>-macos.zip`。默认是通用程序，Apple 芯片和 Intel 的 Mac 都能运行。
+4. 自检（可选）：`uv run python scripts/build_app.py smoke macos` 运行一次打包好的程序，检查项目文件、Excel、出版图、SRIM 和熔盐计算都能用，然后自动退出。
+
+Windows 上需要 Visual Studio 2022（安装时勾选“使用 C++ 的桌面开发”）；Linux 上需要的系统软件包可以用 `uv run flet --version --json` 查看（`linux_dependencies`），用 apt 安装。命令相同，把 `macos` 换成 `windows` 或 `linux`。
+
+打包时脚本把界面资源（`src/GMA/UI/assets`）复制到 `src/assets`：打包的程序从那里读取图标和字体，flet 也按其中的 `icon.png`、`icon_macos.png` 生成各系统的应用图标。打包结束后这个副本会删除，不需要提交。
+
+程序没有签名。别人下载 Mac 版后第一次打开会被系统拦下，需要在“系统设置 → 隐私与安全性”中点“仍要打开”（macOS 15 起不能再用右键打开绕过）；Windows 可能提示“Windows 已保护你的电脑”，点“更多信息”→“仍要运行”。正式分发需要 Apple 的 Developer ID 签名与公证，以及 Windows 的代码签名证书。
+
+### 用 GitHub Actions 打包
+
+`.github/workflows/build-app.yml` 在 GitHub 的 macOS、Windows、Linux 机器上各打一个包，再运行一次自检：
+
+- 手动：仓库页面 → Actions → Build desktop app → Run workflow；
+- 打标签：`git tag v0.2.0 && git push origin v0.2.0`；
+- 修改打包相关文件（这个 workflow、`scripts/build_app.py`、`src/main.py`、自检）的 PR 也会运行，检查打包是否还能用。
+
+打好的包在这次运行页面底部的 Artifacts 中下载。
 
 ## 快速上手
 
@@ -458,6 +505,44 @@ analyzer.component_table(m)        # 分峰、峰位、峰高、面积、面积�
 
 未拟合的谱只有数据范围、点数和最大强度位置。计算在 `GMA.CM.common.metrics` 中实现，其他表征方法的拟合谱也可以用 `spectrum_metrics(df, AXIS)`。
 
+### 计算
+
+`GMA.SC`（Simulation & Calculation）中是与具体表征方法无关的计算，图形界面中的计算工具调用的也是这些函数。
+
+**SRIM：离子辐照的损伤和注入离子浓度。** 读取 TRIM 输出的 VACANCY.txt 和 RANGE.txt（Quick K-P、Full Cascade 都可以，也支持多层靶和小数逗号）：
+
+```python
+from GMA.SC.SRIM import IONS_PERCENT, SRIMPlotter, average, depth_profile, peak, read_range, read_vacancy
+
+vacancy = read_vacancy("VACANCY.txt")
+ions = read_range("RANGE.txt")                        # 可选：注入离子的分布
+profile = depth_profile(vacancy, ions, fluence=1e16)  # 注量 ions/cm²；原子密度默认取文件头中的值
+peak(profile)                                         # (峰值 dpa, 所在深度 nm)
+average(profile, start=0, end=500)                    # 0–500 nm 内的平均 dpa
+peak(profile, IONS_PERCENT)                           # 注入离子浓度的峰值（at.%）和所在深度
+SRIMPlotter().plot_profile_static(profile, show=False, save_path="dpa.png")   # dpa 和离子浓度画在两条纵轴上
+```
+
+| 量 | 计算方法 |
+| --- | --- |
+| dpa | 空位（vacancies/(Å·ion)）× 10⁸ × 注量 ÷ 原子密度。Quick K-P 的空位是离子产生的加反冲产生的；Full Cascade 是各元素空位之和（不加 Knock-Ons 列），与文件头的 Total Target Vacancies 一致 |
+| 注入离子浓度 | C = 离子分布（(atoms/cm³)/(atoms/cm²)）× 注量，at.% = C ÷ (C + N) × 100 |
+| 原子密度 N | 深度所在层的原子密度，默认取文件头；`depth_profile(..., densities=[...])` 可以按层修改 |
+
+深度用 nm（SRIM 深度区间的右端）；按束流和时间计算时，注量 = 束流（ions/(cm²·s)）× 时间（s）。`average` 只覆盖深度区间的一部分时按覆盖的长度计入。
+
+**Salts：熔盐配比。** 按各盐的摩尔分数和混合盐的总质量，计算每种盐的质量：
+
+```python
+from GMA.SC.Salts import PRESETS, molar_mass, salt_masses
+
+molar_mass("LiF")                                      # 25.938 g/mol
+salt_masses(PRESETS["FLiNaK"], total_mass=100)         # LiF-NaF-KF 46.5-11.5-42 mol%，共 100 g
+salt_masses({"LiF": 2, "BeF2": 1}, 50, molar_masses={"LiF": 26.0})   # 比例自动归一化；可以覆盖摩尔质量
+```
+
+m_i = 总质量 × x_i·M_i ÷ Σ x_j·M_j，x 为摩尔分数，M 为摩尔质量。摩尔质量按化学式（支持括号、下标和结晶水，如 Ca(NO3)2、MgCl2·6H2O）和 IUPAC 标准原子量计算；同位素富集的盐（如 ⁷LiF）用 `molar_masses` 给出。`PRESETS` 中是几种常见组成（FLiNaK、FLiBe 和几种氯化物共晶），只是起点，按自己的实验修改即可。
+
 ## 项目文件
 
 `GMA.project` 把多个样品、多种表征方法的数据整理成一个项目，保存为一个 NetCDF-4 文件（`.nc`）。文件内部是 xarray 的 DataTree，层级为 `/样品/方法/谱图`，不用 GMA 也能用 `xarray.open_datatree(path, engine="h5netcdf")` 直接打开。
@@ -507,8 +592,9 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **Raman**：读取（Horiba LabRAM HR Evolution 导出的 txt）和绘图已完成。
 - **XRD**：读取（Bruker D8 Advance 导出的 txt）和绘图已完成。
 - **结构化存储**：项目文件（NetCDF）、导入与清洗记录、CSV / Excel 导出已完成。
-- **UI**：启动器、工作区、项目总览，以及 XPS、Raman、XRD 模块已完成；计算工具模块、打包等规划中。
-- **其他表征方法的分析、计算**：规划中。
+- **计算**：SRIM 损伤（dpa）与注入离子浓度、熔盐配比已完成。
+- **UI**：启动器、工作区、项目总览，XPS、Raman、XRD 和计算工具模块，中英文界面、自动备份、项目锁、新建窗口和打包已完成。
+- **其他表征方法的分析**：规划中。
 
 ## License
 

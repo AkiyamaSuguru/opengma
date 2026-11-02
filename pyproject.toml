@@ -10,7 +10,6 @@ dependencies = [
     "flet>=1.0.5",
     "flet-charts>=1.0.5",
     "h5netcdf[h5py]>=1.8.2",
-    "marimo>=0.23.16",
     "matplotlib>=3.11.2",
     "numpy>=2.3",
     "openpyxl>=3.1.5",
@@ -42,6 +41,10 @@ asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["ignore:The default engine for reading 'xlsx' files:DeprecationWarning"]
 
 [dependency-groups]
+# marimo 笔记本：uv sync 默认安装（见 [tool.uv]）；不在 [project] 的依赖中，所以不会打包进图形界面程序
+notebook = [
+    "marimo>=0.23.16",
+]
 dev = [
     "flet-cli>=1.0.5",
     "flet-desktop>=1.0.5",
@@ -49,3 +52,24 @@ dev = [
     "flet[test]>=1.0.5",
     "pytest>=9.2.0",
 ]
+
+[tool.uv]
+default-groups = ["dev", "notebook"]
+
+# ============================================================
+# 打包图形界面（flet build）：uv run python scripts/build_app.py build <macos|windows|linux>
+# 程序带着自己的 Python（版本按上面的 requires-python 选），依赖取自 [project] 的 dependencies
+# ============================================================
+[tool.flet]
+product = "OpenGMA"            # 窗口、启动台、关于对话框中显示的名称
+artifact = "OpenGMA"           # 程序文件名：OpenGMA.app、OpenGMA.exe、OpenGMA
+org = "io.github.akiyamasuguru"
+company = "Jay Ma"
+copyright = "Copyright © 2026 Jay Ma. Licensed under AGPL-3.0-only."
+
+[tool.flet.app]
+path = "src"                   # 打包 src 文件夹：入口 src/main.py 和 GMA 包
+module = "main"
+
+[tool.flet.linux]
+categories = ["Science", "Education"]

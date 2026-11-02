@@ -36,7 +36,7 @@ from .screen import (
     measure_work_area,
     window_size,
 )
-from .services import autosave, launch, locks
+from .services import autosave, launch, locks, smoke
 from .session import ProjectSession, read_ui_state
 from .settings import load_settings, save_settings, settings_path
 from .strings import S
@@ -94,9 +94,19 @@ class App:
                 and await self.open_project(last.path)):
             return
         await self.show_launcher()
+        if smoke.requested() is not None:   # 打包后的自检：不打开其他对话框
+            page.run_task(self.smoke_test)
+            return
         if backups:
             from .components.recovery_dialog import RecoveryDialog
             RecoveryDialog(self, backups).show()
+
+    async def smoke_test(self) -> None:
+        """打包后的自检（见 services/smoke.py）：启动器显示出来以后运行检查，写出结果，然后退出。"""
+        result = await asyncio.to_thread(smoke.run_checks)
+        result["window"] = [self.page.window.width, self.page.window.height]
+        await asyncio.to_thread(smoke.write_result, smoke.requested(), result)
+        await self.quit()
 
     @property
     def area(self) -> tuple[float, float]:
