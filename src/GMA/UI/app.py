@@ -10,13 +10,16 @@ OpenGMA 图形界面的入口：启动器与工作区之间的换窗、主题、
 Windows、macOS、Linux 用同一套做法（设计原则第 1 条）：
 - 启动器和工作区是同一个窗口，换窗时把透明度设为 0，改尺寸和内容并居中后再设回 1；不隐藏窗口；
 - 两个窗口都用系统标题栏，共用一个最小尺寸；默认尺寸按可用屏幕区域的比例（screen.py）；
-- 快捷键用 Ctrl + 字母，同时接受 ⌘。
+- 快捷键用 Ctrl + 字母，同时接受 ⌘；
+- 自动备份、项目锁只用文件和时间判断（services/autosave.py、locks.py），新建窗口是再启动一个进程
+  （services/launch.py）。
 """
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import traceback
+import uuid
 from pathlib import Path
 
 import flet as ft
@@ -32,6 +35,7 @@ from .screen import (
     measure_work_area,
     window_size,
 )
+from .services import autosave, launch, locks
 from .session import ProjectSession, read_ui_state
 from .settings import load_settings, save_settings, settings_path
 from .strings import S
@@ -57,6 +61,8 @@ class App:
         self.clipboard = ft.Clipboard()
         self.p = th.palette(self.settings.primary, False)
         self._busy = False   # 换窗、关闭等进行中时忽略重复的关闭请求
+        self.token = uuid.uuid4().hex   # 这个窗口（进程）的标识，写在项目锁中
+        self.last_backup = None          # 上次自动备份的时间（状态栏显示）
 
     # ============================================================
     # 启动
@@ -74,15 +80,22 @@ class App:
         page.on_platform_brightness_change = self.on_brightness
         self.apply_theme(rebuild=False)
         page.update()
+        new_window = launch.is_new_window()
         if not self.settings.work_area:
             area = await measure_work_area(page, self.tracker)
             if area:
                 self.settings.work_area = list(area)
                 self.save_settings()
+        page.run_task(self.keep_alive)
         last = next((r for r in self.settings.recent if r.exists), None)
-        if self.settings.startup == "last_project" and last is not None and await self.open_project(last.path):
+        backups = await asyncio.to_thread(autosave.list_backups)
+        if (not new_window and not backups and self.settings.startup == "last_project" and last is not None
+                and await self.open_project(last.path)):
             return
         await self.show_launcher()
+        if backups:
+            from .components.recovery_dialog import RecoveryDialog
+            RecoveryDialog(self, backups).show()
 
     @property
     def area(self) -> tuple[float, float]:
@@ -170,7 +183,10 @@ class App:
         await self._swap(WORKSPACE, self.workspace.build(), self.window_title())
 
     def window_title(self) -> str:
-        return S.WINDOW_TITLE.format(name=self.session.name) if self.session else S.APP_NAME
+        if self.session is None:
+            return S.APP_NAME
+        title = S.READ_ONLY_TITLE if self.session.read_only else S.WINDOW_TITLE
+        return title.format(name=self.session.name)
 
     # ============================================================
     # 窗口事件与退出
@@ -204,16 +220,114 @@ class App:
         if not await self.confirm_discard():
             return
         self.remember_recent()
+        self.release_session()
         if quit_app:
             await self.quit()
         else:
             await self.show_launcher()
 
     async def quit(self) -> None:
+        self.release_session()
         self.save_settings()
         self.page.window.prevent_close = False
         self.page.update()
         await self.page.window.destroy()
+
+    def release_session(self) -> None:
+        """离开当前项目（已保存或确认放弃修改）：删除它的自动备份，释放项目锁。"""
+        session = self.session
+        if session is None:
+            return
+        autosave.remove_backup(session.backup_key)
+        if session.locked_path is not None:
+            locks.release(session.locked_path, self.token)
+            session.locked_path = None
+
+    # ============================================================
+    # 自动备份、项目锁的心跳；新建窗口
+    # ============================================================
+    async def keep_alive(self) -> None:
+        """每分钟更新项目锁和自动备份的心跳；有未保存的修改时，每 5 分钟写一份自动备份。"""
+        ticks = 0
+        while True:
+            await asyncio.sleep(autosave.HEARTBEAT)
+            ticks += 1
+            session = self.session
+            if session is None:
+                continue
+            with contextlib.suppress(Exception):  # 心跳、备份失败都不影响使用
+                if session.locked_path is not None:
+                    await asyncio.to_thread(locks.heartbeat, session.locked_path, self.token)
+                await asyncio.to_thread(autosave.heartbeat, session.backup_key)
+            if ticks * autosave.HEARTBEAT >= autosave.INTERVAL and session.dirty:
+                ticks = 0
+                await self.write_backup()
+
+    async def write_backup(self) -> None:
+        session = self.session
+        if session is None:
+            return
+        try:
+            if self.workspace is not None:
+                session.project.ui_state = self.workspace.ui_state()
+            from ..project import project_to_datatree
+            tree = project_to_datatree(session.project)   # 在主线程中取快照，写文件在后台线程
+            await asyncio.to_thread(autosave.write_backup, session.backup_key, tree, name=session.name,
+                                    source=session.path)
+        except Exception:  # noqa: BLE001 - 备份失败不打扰用户，下次再试
+            print(traceback.format_exc(), flush=True)
+            return
+        from datetime import datetime
+        self.last_backup = datetime.now()
+        if self.workspace is not None and self.session is session:
+            self.workspace.set_status(S.AUTOSAVED_AT.format(time=self.last_backup.strftime("%H:%M")))
+
+    def new_window(self, e=None) -> None:
+        if not launch.open_new_window():
+            self.toast(S.NEW_WINDOW_UNAVAILABLE)
+        else:
+            self.toast(S.NEW_WINDOW_OPENING)
+
+    async def open_backup(self, backup: autosave.Backup) -> bool:
+        """打开自动备份：项目标为有未保存的修改，保存时写回原来的文件。"""
+        if not await self.confirm_discard():
+            return False
+        try:
+            project = await asyncio.to_thread(autosave.open_backup, backup)
+        except Exception as exc:  # noqa: BLE001
+            show_error(self.page, self.p, S.OPEN_FAILED, S.FILE_ERROR.format(name=backup.name, error=exc),
+                       traceback.format_exc())
+            return False
+        session = ProjectSession(project, backup_key=backup.key)
+        if session.path is not None and not await self.check_lock(session):
+            return False
+        self.release_session()
+        await self.take_lock(session)
+        tabs, active = read_ui_state(project.ui_state, {m.key for m in registry.available()})
+        await self.show_workspace(session, tabs, active)
+        toast(self.page, self.p, S.RECOVERED)
+        return True
+
+    async def check_lock(self, session: ProjectSession) -> bool:
+        """
+        打开项目前检查项目锁：别的窗口（或别的电脑）正开着这个项目时询问只读打开、仍然编辑或取消；
+        返回 False 表示取消。只读时 session.read_only 为 True。
+        """
+        info = await asyncio.to_thread(locks.read_lock, session.path, self.token)
+        if info is None:
+            return True
+        from .components.dialogs import ask_locked
+        choice = await ask_locked(self.page, self.p, session.name, info)
+        if choice is None:
+            return False
+        session.read_only = choice == "read_only"
+        return True
+
+    async def take_lock(self, session: ProjectSession) -> None:
+        """给项目文件加锁（只读打开时不加）；写不了锁文件时不影响使用。"""
+        if session.path is not None and not session.read_only and \
+                await asyncio.to_thread(locks.acquire, session.path, self.token):
+            session.locked_path = session.path
 
     # ============================================================
     # 项目：新建、打开、保存
@@ -231,6 +345,7 @@ class App:
         """新建空项目并打开工作区；从启动器的模块卡片进入时同时打开该模块。"""
         if not await self.confirm_discard():
             return
+        self.release_session()
         tabs = [{"module": module_key, "state": {}}] if module_key else []
         await self.show_workspace(ProjectSession(), tabs, 1 if tabs else 0)
 
@@ -255,13 +370,18 @@ class App:
                     self.rebuild()
             show_error(self.page, self.p, S.OPEN_FAILED, S.FILE_ERROR.format(name=Path(path).name, error=exc), traceback.format_exc())
             return False
+        if not await self.check_lock(session):
+            return False
+        self.release_session()
+        await self.take_lock(session)
         tabs, active = read_ui_state(session.project.ui_state, {m.key for m in registry.available()})
         if not tabs:
             tabs = [{"module": registry.for_method(m).key, "state": {}} for m in session.project.methods()]
             active = 1 if tabs else 0
         await self.show_workspace(session, tabs, active)
         self.remember_recent()
-        toast(self.page, self.p, S.OPENED.format(name=session.name))
+        toast(self.page, self.p, S.OPENED_READ_ONLY.format(name=session.name) if session.read_only
+              else S.OPENED.format(name=session.name))
         return True
 
     async def save(self, save_as: bool = False) -> bool:
@@ -269,6 +389,9 @@ class App:
         if session is None:
             return False
         path = None
+        if session.read_only and not save_as:   # 只读打开的项目不写回原来的文件
+            toast(self.page, self.p, S.READ_ONLY_SAVE)
+            save_as = True
         if save_as or session.path is None:
             path = await self.file_picker.save_file(dialog_title=S.SAVE_PROJECT_AS.rstrip("…"),
                                                     file_name=f"{session.name}.nc",
@@ -276,12 +399,29 @@ class App:
                                                     allowed_extensions=["nc"])
             if not path:
                 return False
+        target = Path(path) if path is not None else session.path
+        if target.suffix.lower() != ".nc":
+            target = target.with_name(target.name + ".nc")
+        if session.locked_path is None or target.resolve() != session.locked_path.resolve():
+            # 要写的文件正在别的窗口中打开（包括只读打开后另存为原来的文件）：确认后才写
+            info = await asyncio.to_thread(locks.read_lock, target, self.token)
+            if info is not None:
+                from .components.dialogs import ask_locked
+                if await ask_locked(self.page, self.p, target.stem, info, saving=True) is None:
+                    return False
         ui_state = self.workspace.ui_state() if self.workspace is not None else None
         try:
             saved = await asyncio.to_thread(session.write, path, ui_state)
         except Exception as exc:  # noqa: BLE001
             show_error(self.page, self.p, S.SAVE_FAILED, str(exc), traceback.format_exc())
             return False
+        if session.locked_path is not None and session.locked_path != saved:
+            locks.release(session.locked_path, self.token)
+            session.locked_path = None
+        session.read_only = False
+        if session.locked_path is None:
+            await self.take_lock(session)
+        autosave.remove_backup(session.backup_key)
         session.changed("saved")
         self.page.title = self.window_title()
         self.page.update()
@@ -338,6 +478,8 @@ class App:
         key = (e.key or "").lower()
         if key in (",", "comma"):
             self.open_settings()
+        elif key == "n" and e.shift:
+            self.new_window()
         elif key == "o":
             await self.open_project()
         elif self.mode == WORKSPACE and self.workspace is not None:

@@ -24,12 +24,20 @@ from .views.module_view import ModuleView
 from .views.overview_view import OverviewView
 from .views.raman_view import RamanView
 from .views.registry import ModuleSpec
+from .views.salt_view import SaltView
+from .views.srim_view import SRIMView
 from .views.xps_view import XPSView
 from .views.xrd_view import XRDView
 
 TAB_H, STRIP_H = 34, 42
-# 各模块的页面；还没有实现的模块（如规划中的计算工具）用占位页
-VIEW_CLASSES = {"xps": XPSView, "raman": RamanView, "xrd": XRDView}
+# 各模块的页面；还没有实现的模块用占位页
+VIEW_CLASSES = {"xps": XPSView, "raman": RamanView, "xrd": XRDView, "srim": SRIMView, "salt": SaltView}
+
+
+def tab_width(title: str) -> int:
+    """模块标签的宽度：放得下标题（按字符估算，汉字约为西文的两倍宽），在 140–240 之间。"""
+    text = sum(12.5 if ord(ch) >= 0x2E80 else 7.8 for ch in title)
+    return int(min(max(72 + text, 140), 240))
 
 
 @dataclass
@@ -205,7 +213,8 @@ class Workspace:
                     overflow=ft.TextOverflow.ELLIPSIS),
             close,
         ], spacing=7, vertical_alignment=ft.CrossAxisAlignment.CENTER)
-        return self._tab_box(content, selected, lambda e, i=index: self.select(i), min_width=140, pad_right=6)
+        return self._tab_box(content, selected, lambda e, i=index: self.select(i), min_width=tab_width(tab.title),
+                             pad_right=6)
 
     def add_menu(self) -> ft.Control:
         p = self.app.p
@@ -252,6 +261,7 @@ class Workspace:
             entry(ft.Icons.FOLDER_OPEN_OUTLINED, S.OPEN_PROJECT, open_, "Ctrl+O"),
             entry(ft.Icons.SAVE_OUTLINED, S.SAVE_PROJECT, self.on_save, "Ctrl+S"),
             entry(ft.Icons.SAVE_AS_OUTLINED, S.SAVE_PROJECT_AS, save_as, "Ctrl+Shift+S"),
+            entry(ft.Icons.OPEN_IN_NEW_ROUNDED, S.NEW_WINDOW, app.new_window, "Ctrl+Shift+N"),
         ]
         recent = [r for r in app.settings.recent if r.exists and (self.session.path is None
                                                                   or r.path != str(self.session.path))][:5]
@@ -282,7 +292,9 @@ class Workspace:
 
     def status_row(self) -> ft.Row:
         p = self.app.p
-        if self.session.path is None:
+        if self.session.read_only:
+            state, color = S.READ_ONLY, p.warning
+        elif self.session.path is None:
             state, color = S.NOT_SAVED_YET, p.faint
         elif self.session.dirty:
             state, color = S.UNSAVED, p.warning
@@ -297,7 +309,8 @@ class Workspace:
             ft.Container(width=8),
             self.readout if self.readout is not None else ft.Container(expand=True),
             w.faint(location, p, th.SIZE_TINY, max_lines=1, tooltip=str(self.session.path or "")),
-            w.dot(color, 6), w.muted(state, p, th.SIZE_TINY),
+            w.dot(color, 6), w.muted(state, p, th.SIZE_TINY, tooltip=S.READ_ONLY_HINT if self.session.read_only
+                                     else None),
         ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
     def set_status(self, text: str | None = None) -> None:
@@ -352,7 +365,7 @@ class Workspace:
         elif key in ("i", "e"):  # 导入、出版图：交给当前的模块标签
             handler = getattr(self.current_view(), "on_shortcut", None)
             if handler is None or not await handler(key, shift):
-                self.app.toast(S.SHORTCUT_IN_MODULE)
+                self.app.toast(S.SHORTCUT_NOT_HERE if self.active else S.SHORTCUT_IN_MODULE)
 
     def ask_open_module(self) -> None:
         """Ctrl+T：列出可以打开的模块。"""

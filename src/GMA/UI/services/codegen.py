@@ -10,7 +10,7 @@ from __future__ import annotations
 import keyword
 import re
 
-from .figures import CJK_FONT, FigureOptions, PlotRequest, figure_size
+from .figures import CJK_FONT, FigureOptions, PlotRequest, ProfileRequest, figure_size
 
 DEFAULT_PALETTE = "tab10"
 PROJECT_PLACEHOLDER = "项目.nc"
@@ -32,9 +32,15 @@ def identifier(name: str, used: set[str]) -> str:
 
 
 def file_stem(request: PlotRequest) -> str:
+    if isinstance(request, ProfileRequest):
+        return safe_stem(request.stem)
     names = {r.name for r in request.records}
-    stem = next(iter(names)) if len(names) == 1 else "figure"
-    return re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", stem).strip() or "figure"
+    return safe_stem(next(iter(names)) if len(names) == 1 else "figure")
+
+
+def safe_stem(stem: str) -> str:
+    """可以作为文件名的名称：去掉各系统文件名中不允许的字符。"""
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(stem)).strip() or "figure"
 
 
 def has_cjk(request: PlotRequest) -> bool:
@@ -69,6 +75,9 @@ def figure_code(request: PlotRequest, options: FigureOptions, *, project_path=No
     """
     plotter = f"{request.method}Plotter"
     lines = ["# OpenGMA 生成：复现出版图。可以粘贴到 marimo、Jupyter 或脚本中运行。"]
+    if isinstance(request, ProfileRequest):  # 计算工具：数据由 setup 中的代码生成
+        return _plot_code(lines + request.setup + [""], request, options, "data", palette, use_latex, substituted,
+                          cjk=False)
     if project_path is None:
         lines.append(f"# 项目还没有保存：先保存项目，再把 {PROJECT_PLACEHOLDER} 改成项目文件的路径。")
     elif dirty:
@@ -100,7 +109,13 @@ def figure_code(request: PlotRequest, options: FigureOptions, *, project_path=No
         lines.append("}")
         data = "data"
     lines.append("")
+    return _plot_code(lines, request, options, data, palette, use_latex, substituted, cjk=cjk)
 
+
+def _plot_code(lines: list[str], request: PlotRequest, options: FigureOptions, data: str, palette, use_latex: bool,
+               substituted: str | None, *, cjk: bool) -> str:
+    """代码的后半段：建 Plotter、调用绘图方法并保存。"""
+    plotter = f"{request.method}Plotter"
     family = [options.font, CJK_FONT] if cjk else options.font
     args = [f"font_family={_value(family)}", f"font_size={_value(float(options.font_size))}"]
     if palette and palette != DEFAULT_PALETTE:

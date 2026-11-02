@@ -142,7 +142,23 @@ def save_project(project: Project, path=None) -> Path:
     保存项目。先写同目录下的临时文件再替换，保存中断时原文件不受影响。
     不给 path 时保存到 project.file_path；扩展名不是 .nc 时自动加上。
     """
-    target = Path(path if path is not None else project.file_path or "")
+    target = write_tree(project_to_datatree(project), path if path is not None else project.file_path)
+    project.file_path = target
+    project.dirty = False
+    return target
+
+
+def save_copy(project: Project, path) -> Path:
+    """把项目写到另一个文件（如自动备份），项目的文件路径和“有未保存的修改”状态不变。"""
+    return write_tree(project_to_datatree(project), path)
+
+
+def write_tree(tree, path) -> Path:
+    """
+    把 project_to_datatree() 的结果写入文件：先写同目录下的临时文件再替换。
+    可以在主线程中生成 tree、在后台线程中写入，写入时界面继续修改项目也不会互相影响。
+    """
+    target = Path(path or "")
     if not str(target) or target == Path("."):
         raise ProjectError("No file path given for saving the project.")
     target = target.expanduser()
@@ -150,15 +166,12 @@ def save_project(project: Project, path=None) -> Path:
         target = target.with_name(target.name + SUFFIX)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.saving")
-    tree = project_to_datatree(project)
     try:
         tree.to_netcdf(temporary, engine=ENGINE)
         os.replace(temporary, target)
     except Exception as exc:
         temporary.unlink(missing_ok=True)
         raise ProjectError(f"Could not save project to {target}: {exc}") from exc
-    project.file_path = target
-    project.dirty = False
     return target
 
 

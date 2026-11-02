@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 from ..project import Project, load_project, save_project
@@ -17,9 +18,12 @@ UI_STATE_VERSION = 1
 
 
 class ProjectSession:
-    def __init__(self, project: Project | None = None):
+    def __init__(self, project: Project | None = None, *, backup_key: str | None = None):
         self.project = project if project is not None else Project(S.UNTITLED)
         self._listeners = []
+        self.read_only = False   # 项目已在别的窗口中打开、选择了只读：不保存到原来的文件
+        self.backup_key = backup_key or uuid.uuid4().hex[:16]   # 自动备份的文件名（services/autosave.py）
+        self.locked_path: Path | None = None   # 这个窗口持有锁的项目文件（services/locks.py）
 
     # ---------- 通知 ----------
     def subscribe(self, listener) -> None:

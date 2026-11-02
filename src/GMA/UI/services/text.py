@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Jay Ma
 # SPDX-License-Identifier: AGPL-3.0-only
-"""界面中显示的时间、路径、版本等文字。"""
+"""界面中显示的时间、路径、版本、数字等文字。"""
 from __future__ import annotations
 
 import importlib.metadata as md
+import math
 import platform
 import re
 import sys
@@ -84,3 +85,39 @@ def plain_label(label: str) -> str:
     text = label.replace(r"$\theta$", "θ")
     text = re.sub(r"\$\^\{([^}]*)\}\$", r"\1", text)
     return text.replace("$", "")
+
+
+def parse_number(text: str) -> float:
+    """输入框中的数：接受 1e16、1E16、1.5×10^16、1,5（小数逗号）；不能解析时抛出 ValueError。"""
+    value = str(text).strip().replace(" ", "")
+    for times in ("×10^", "x10^", "X10^", "*10^"):
+        value = value.replace(times, "e")
+    if value.count(",") == 1 and "." not in value:
+        value = value.replace(",", ".")
+    return float(value)
+
+
+def sci(value: float | None, digits: int = 3) -> str:
+    """
+    用于显示的数：很大或很小时写成 3.60e15（与输入框中的写法相同；界面字体中没有 ⁴–⁹ 等上标数字），
+    其余直接写，保留 digits + 1 位有效数字。
+    """
+    if value is None or not math.isfinite(value):
+        return "—"
+    if value == 0 or 1e-3 <= abs(value) < 1e5:
+        return f"{value:.{digits + 1}g}"
+    mantissa, exponent = f"{value:.{digits - 1}e}".split("e")
+    return f"{mantissa}e{int(exponent)}"
+
+
+def field_text(value) -> str:
+    """数在输入框中的写法：1e+16 写成 1e16，100.0 写成 100；None 为空。"""
+    if value is None:
+        return ""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return str(value)
+    text = f"{value:g}"
+    if "e" in text:
+        mantissa, exponent = text.split("e")
+        return f"{mantissa}e{int(exponent)}"
+    return text

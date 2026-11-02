@@ -112,7 +112,8 @@ def test_registry():
     assert [registry.for_method(m).key for m in ("XPS", "Raman", "XRD")] == ["xps", "raman", "xrd"]
     groups = registry.by_category()
     assert [m.key for m in groups[registry.METHOD]] == ["xps", "raman", "xrd"]
-    assert all(m.planned for m in groups[registry.TOOL])
+    assert [m.key for m in groups[registry.TOOL]] == ["srim", "salt"]
+    assert not any(m.planned for m in registry.MODULES)  # P5：计算工具也已实现
     assert all((Path(theme.__file__).parent / "assets" / m.icon_src).is_file() for m in registry.MODULES)
 
 

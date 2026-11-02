@@ -4,7 +4,8 @@
 出版图：把界面上的选项翻译成 GMA Plotter 的参数，生成图片（方案 6.3）。
 
 - 只调用 GMA 已有的出版图函数（谱线图 plot_survey_static、plot_spectrum_static、plot_pattern_static，
-  拟合谱图 plot_element_static、plot_fit_static），预览就是导出的图片；
+  拟合谱图 plot_element_static、plot_fit_static，计算工具的 SRIMPlotter.plot_profile_static），
+  预览就是导出的图片；
 - 字体：系统中没有所选字体时（如 Linux 上通常没有 Times New Roman），用随应用附带的、字宽相同的
   Liberation 字体代替；中文（如样品名）用随应用附带的 Noto Sans SC 显示（方案 11.2）；
 - 每次生成后关闭 matplotlib 的 figure，避免内存不断增长（方案 6.6）。
@@ -17,7 +18,7 @@ from __future__ import annotations
 import io
 import math
 import warnings
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import matplotlib
@@ -29,6 +30,7 @@ from ...CM.Raman import RamanPlotter
 from ...CM.XPS import XPSPlotter
 from ...CM.XRD import XRDPlotter
 from ...project import Record
+from ...SC.SRIM import SRIMPlotter
 from .spectra import Display, component_colors, overlay_colors, overlay_labels
 
 FONT_DIR = Path(__file__).resolve().parents[1] / "assets" / "fonts"
@@ -46,7 +48,7 @@ FORMATS = ("png", "svg", "pdf", "tiff", "jpg")
 HTML = "html"  # 交互 HTML（plotly）
 LEGEND_LOCS = ("best", "upper right", "upper left", "lower left", "lower right", "center right", "center left",
                "upper center", "lower center")
-PLOTTERS = {"XPS": XPSPlotter, "Raman": RamanPlotter, "XRD": XRDPlotter}
+PLOTTERS = {"XPS": XPSPlotter, "Raman": RamanPlotter, "XRD": XRDPlotter, "SRIM": SRIMPlotter}
 # 各方法的谱线图（可以叠加、标峰位）和拟合谱图（画分峰）；XRD 没有拟合谱图
 LINE_FUNCTIONS = {"XPS": "plot_survey_static", "Raman": "plot_spectrum_static", "XRD": "plot_pattern_static"}
 FIT_FUNCTIONS = {"XPS": "plot_element_static", "Raman": "plot_fit_static"}
@@ -139,6 +141,25 @@ class PlotRequest:
         if self.single:
             return self.records[0].to_dataframe()
         return {k: r.to_dataframe() for k, r in zip(self.keys, self.records, strict=True)}
+
+
+@dataclass
+class ProfileRequest(PlotRequest):
+    """
+    计算工具（如 SRIM）的出版图：数据由工具页算好后直接给出，不在项目中。
+    “复制为代码”时，setup 是读取文件、计算数据并赋给 data 的那几行代码。
+    """
+
+    frame: object = None                            # 要画的 DataFrame
+    setup: list[str] = field(default_factory=list)  # 生成 data 的代码
+    stem: str = "figure"                            # 导出文件的默认文件名
+
+    @property
+    def single(self) -> bool:
+        return True
+
+    def data(self):
+        return self.frame
 
 
 # ============================================================

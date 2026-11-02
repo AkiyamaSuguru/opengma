@@ -50,15 +50,16 @@ class ModuleSpec:
 
 MODULES: tuple[ModuleSpec, ...] = (
     ModuleSpec("xps", "XPS", "xps", "#2563EB", "#60A5FA", "#E5EEFE", "#1B2A44", METHOD, AVAILABLE,
-               "Avantage 导出数据\n全谱 · 元素谱", method="XPS", formats="Avantage 导出的 .xlsx / .xls，其他软件导出的表格"),
+               S.MODULE_XPS_DESC, method="XPS", formats=S.MODULE_XPS_FORMATS),
     ModuleSpec("raman", "Raman", "raman", "#7C3AED", "#A78BFA", "#F0E9FE", "#2A2142", METHOD, AVAILABLE,
-               "Horiba LabSpec\n谱线 · 拟合谱", method="Raman", formats="LabSpec 导出的 .txt，其他软件导出的表格"),
+               S.MODULE_RAMAN_DESC, method="Raman", formats=S.MODULE_RAMAN_FORMATS),
     ModuleSpec("xrd", "XRD", "xrd", "#D97706", "#FBBF24", "#FDF1DE", "#3A2D14", METHOD, AVAILABLE,
-               "Bruker D8 Advance\n图谱 · 参考物相", method="XRD", formats="D8 Advance 导出的 .txt，其他软件导出的表格"),
-    ModuleSpec("srim", "SRIM · dpa", "calc", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, PLANNED,
-               "离子辐照\n损伤计算"),
-    ModuleSpec("salt", "熔盐配比", "calc", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, PLANNED,
-               "LiF-NaF-KF 等\n质量配比"),
+               S.MODULE_XRD_DESC, method="XRD", formats=S.MODULE_XRD_FORMATS),
+    # 计算工具（SC）：同一个模块色；数据不在项目中，标签中保存输入和读取的文件内容
+    ModuleSpec("srim", S.MODULE_SRIM_TITLE, "srim", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, AVAILABLE,
+               S.MODULE_SRIM_DESC),
+    ModuleSpec("salt", S.MODULE_SALT_TITLE, "salt", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, AVAILABLE,
+               S.MODULE_SALT_DESC),
 )
 _BY_KEY = {m.key: m for m in MODULES}
 _BY_METHOD = {m.method: m for m in MODULES if m.method}

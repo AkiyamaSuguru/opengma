@@ -10,6 +10,7 @@ OPENGMA_HOME 改到别处（测试中用到）。
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
@@ -91,6 +92,8 @@ class Settings:
     recent_limit: int = 5
     language: str = "zh"
     recent: list[RecentProject] = field(default_factory=list)
+    # 计算工具：熔盐配比的预设组成，None 表示使用内置预设（见 GMA.SC.Salts.PRESETS）
+    salt_presets: list[dict] | None = None
 
     # ---------- 读写 ----------
     @classmethod
@@ -112,6 +115,8 @@ class Settings:
             elif f.name in ("launcher_size", "workspace_size", "work_area"):
                 if value is None or (_pair(value) and all(v > 0 for v in value)):
                     setattr(settings, f.name, None if value is None else [float(v) for v in value])
+            elif f.name == "salt_presets":
+                settings.salt_presets = clean_presets(value)
             elif f.name == "readers":
                 if isinstance(value, dict):
                     settings.readers.update({k: v for k, v in value.items() if isinstance(v, str)})
@@ -150,6 +155,33 @@ class Settings:
     def remove_recent(self, path) -> None:
         path = str(path)
         self.recent = [r for r in self.recent if r.path != path]
+
+
+def clean_presets(value) -> list[dict] | None:
+    """
+    熔盐配比的预设：[{"name": 名称, "salts": [[化学式, 摩尔比例, 摩尔质量或 None], ...]}, ...]。
+    格式不对的条目跳过；整个值不是列表时为 None（使用内置预设）。
+    """
+    if not isinstance(value, list):
+        return None
+    out, names = [], set()
+    for item in value:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"].strip():
+            continue
+        name = item["name"].strip()
+        salts = []
+        for row in item.get("salts") or []:
+            if (isinstance(row, (list, tuple)) and len(row) == 3 and isinstance(row[0], str) and row[0].strip()
+                    and _number(row[1]) and (row[2] is None or _number(row[2]))):
+                salts.append([row[0].strip(), float(row[1]), None if row[2] is None else float(row[2])])
+        if salts and name not in names:
+            names.add(name)
+            out.append({"name": name, "salts": salts})
+    return out
+
+
+def _number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 
 
 def _pair(value) -> bool:

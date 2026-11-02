@@ -118,9 +118,33 @@ class OverviewView(TabView):
             w.text(S.EMPTY_PROJECT, p, th.SIZE_PANEL_TITLE, bold=True),
             ft.Container(width=460, content=ft.Text(S.EMPTY_PROJECT_HINT, size=th.SIZE_SMALL, color=p.muted,
                                                    text_align=ft.TextAlign.CENTER)),
-            ft.FilledButton(S.IMPORT_DATA, icon=ft.Icons.UPLOAD_FILE_OUTLINED, disabled=True,
-                            tooltip=S.NOT_YET.format(phase="P3")),
+            self.import_menu(),
         ], spacing=8, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER))
+
+    def import_menu(self) -> ft.Control:
+        """空项目中的“导入数据…”：选择表征方法后打开（或切到）那个模块，并打开它的导入对话框。"""
+        p = self.p
+
+        async def import_into(key):
+            self.workspace.open_module(key, reuse=True)
+            view = self.workspace.current_view()
+            handler = getattr(view, "on_shortcut", None)
+            if handler is not None:
+                await handler("i", False)
+
+        items = [ft.PopupMenuItem(
+            content=ft.Row([w.module_icon(m, p.dark, 16), ft.Text(m.title, size=th.SIZE_BODY, color=p.text)],
+                           spacing=10),
+            on_click=lambda e, k=m.key: self.app.page.run_task(import_into, k))
+            for m in registry.available() if m.method]
+        button = ft.Container(
+            content=ft.Row([ft.Icon(ft.Icons.UPLOAD_FILE_OUTLINED, size=18, color=p.on_primary),
+                            ft.Text(S.IMPORT_DATA, size=th.SIZE_BODY, color=p.on_primary, weight=ft.FontWeight.W_600),
+                            ft.Icon(ft.Icons.EXPAND_MORE_ROUNDED, size=16, color=p.on_primary)],
+                           spacing=6, tight=True),
+            bgcolor=p.primary, border_radius=20, padding=ft.Padding.symmetric(horizontal=16, vertical=9))
+        return ft.PopupMenuButton(content=button, items=items, menu_position=ft.PopupMenuPosition.UNDER,
+                                  tooltip=S.IMPORT_INTO_MODULE)
 
     def table_header(self) -> ft.Control:
         p, project = self.p, self.project
