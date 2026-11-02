@@ -20,25 +20,26 @@ from pathlib import Path
 
 SMOKE_ENV = "OPENGMA_SMOKE_TEST"
 
-# 一个很小的 Quick K-P VACANCY.txt（格式与 TRIM 输出相同）
+# 一个很小的 Quick K-P VACANCY.txt（格式与 TRIM 输出相同，数值取自 tests/data/srim 中的合成数据）
 _VACANCY = """\
- Ion    = Xe   Energy = 5400 keV
+ Ion    = Ar   Energy = 2000 keV
 ============= TARGET MATERIAL ======================================
-Layer  1 : Layer 1
+Layer  1 : SiC
 Layer Width =     4.E+02 A ;
-  Layer # 1- Density = 10.79E22 atoms/cm3 = 2.153 g/cm3
-  Layer # 1-  C = 100  Atomic Percent = 100  Mass Percent
+  Layer # 1- Density = 9.643E22 atoms/cm3 = 3.21 g/cm3
+  Layer # 1- Si = 50  Atomic Percent = 70.04  Mass Percent
+  Layer # 1-  C = 50  Atomic Percent = 29.96  Mass Percent
 ====================================================================
- Total Ions calculated =30000.00
+ Total Ions calculated =10000.00
 ==========================================================
    TARGET     VACANCIES     VACANCIES
    DEPTH         by            by
    (Ang.)       IONS         RECOILS
 -----------  -----------  ------------
-100000.E-03  3680.56E-05  3223.15E-04
-200000.E-03  3821.46E-05  3316.15E-04
-300000.E-03  3852.37E-05  3393.90E-04
-400000.E-03  3874.16E-05  3422.25E-04
+100000.E-03  1261.73E-05  9250.38E-05
+200000.E-03  1264.79E-05  9251.74E-05
+300000.E-03  1269.40E-05  9254.77E-05
+400000.E-03  1275.53E-05  9260.15E-05
 """
 
 

@@ -34,7 +34,7 @@ TRIM 每次计算在 `SRIM Outputs` 中写出 VACANCY.txt（空位）和 RANGE.t
 - 某些系统区域设置下 SRIM 写出的是小数逗号（`1,5E-04`），读取时按小数点处理。
 - 读不出表格、表头或文件头中缺少原子密度时抛出 `SRIMFileError`，信息说明缺的是什么。
 
-测试数据：`tests/data/srim` 中是一组真实的 Quick K-P 结果（Xe 5.4 MeV 打石墨）。Full Cascade、多层靶等格式在 `tests/test_sc.py` 中按 TRIM 的格式合成。
+测试数据：`tests/data/srim` 中是按 TRIM Quick K-P 输出的格式合成的一组文件（Ar 2 MeV 打 SiC），由同一文件夹中的 `make_synthetic.py` 用解析函数生成，不是 SRIM 的计算结果；文件头中的总空位数、平均射程、穿透的离子数等由表格算出，与表格一致。Full Cascade、多层靶等格式在 `tests/test_sc.py` 中按 TRIM 的格式手写。真实的 SRIM 结果只用来核对，不提交到仓库。
 
 ### 计算
 

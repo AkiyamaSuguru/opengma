@@ -93,7 +93,7 @@ def test_srim_view_state_roundtrip():
 
 
 def test_srim_mismatch_and_only_range():
-    other = (DATA / "VACANCY.txt").read_text(encoding="latin-1").replace("Ion    = Xe   Energy = 5400 keV",
+    other = (DATA / "VACANCY.txt").read_text(encoding="latin-1").replace("Ion    = Ar   Energy = 2000 keV",
                                                                           "Ion    = Kr   Energy = 4000 keV")
     view = srim_view(srim_state(vacancy={"name": "VACANCY.txt", "path": "", "text": other}))
     view.compute()   # 不是同一次计算：只算 dpa，并提示
@@ -123,7 +123,7 @@ def test_srim_figure_and_code(tmp_path):
     request = view.figure_request(options)
     assert request.kwargs["depth_unit"] == "nm" and request.kwargs["concentration"] is True
     assert figures.render(request, options, fmt="png").data[:4] == b"\x89PNG"
-    assert codegen.file_stem(request) == "SRIM_Xe_5400keV"
+    assert codegen.file_stem(request) == "SRIM_Ar_2000keV"
     code = codegen.figure_code(request, options)
     assert "from GMA.SC.SRIM import SRIMPlotter" in code and "plotter.plot_profile_static(" in code
     cwd = os.getcwd()
@@ -132,7 +132,7 @@ def test_srim_figure_and_code(tmp_path):
         exec(compile(code, "copied.py", "exec"), {})  # noqa: S102
     finally:
         os.chdir(cwd)
-    assert (tmp_path / "SRIM_Xe_5400keV.png").is_file()
+    assert (tmp_path / "SRIM_Ar_2000keV.png").is_file()
     # 两种曲线都关掉时至少画一种
     view.st["figure_parts"] = {"damage": False, "ions": False, "elements": False}
     assert view.figure_parts()["damage"] and view.figure_parts()["ions"]

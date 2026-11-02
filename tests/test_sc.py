@@ -3,8 +3,9 @@
 """
 SC 模块：SRIM 的 dpa 和注入离子浓度、熔盐配比。
 
-tests/data/srim 中是一次真实的 Quick K-P 计算（Xe 5.4 MeV → 石墨）的 VACANCY.txt、RANGE.txt；
-Full Cascade、多层靶用下面手写的小文件（格式与 SRIM-2013 的输出相同）。
+tests/data/srim 中是按 TRIM Quick K-P 输出的格式合成的 VACANCY.txt、RANGE.txt（Ar 2000 keV → SiC，
+由同一文件夹中的 make_synthetic.py 生成，不是 SRIM 的计算结果）；Full Cascade、多层靶用下面手写的小文件
+（格式与 SRIM-2013 的输出相同）。
 """
 from pathlib import Path
 
@@ -82,14 +83,14 @@ FULL_RANGE = FULL_HEADER.replace("VACANCY production", "and final RECOIL ATOM Di
 
 
 # ============================================================
-# SRIM：Quick K-P（真实文件）
+# SRIM：Quick K-P（合成文件，格式与 TRIM 的输出相同）
 # ============================================================
 def test_quick_vacancy():
     v = read_vacancy(DATA / "VACANCY.txt")
-    assert (v.mode, v.ion, v.energy, v.ions_calculated) == ("quick", "Xe", 5400.0, 30000.0)
+    assert (v.mode, v.ion, v.energy, v.ions_calculated) == ("quick", "Ar", 2000.0, 10000.0)
     layer = v.layers[0]
     assert (layer.name, layer.width, layer.density, layer.mass_density, layer.elements) == \
-        ("Layer 1", 20000.0, 10.79e22, 2.153, {"C": 100.0})
+        ("SiC", 20000.0, 9.643e22, 3.21, {"Si": 50.0, "C": 50.0})
     assert len(v.depth) == 100 and v.bin_width == pytest.approx(200.0) and v.depth[-1] == pytest.approx(20000.0)
     assert list(v.columns) == ["Vacancies by ions", "Vacancies by recoils"]
     # 按表格积分的空位数与文件头的 Total Target Vacancies 一致
@@ -99,15 +100,15 @@ def test_quick_vacancy():
 
 def test_quick_range():
     r = read_range(DATA / "RANGE.txt")
-    assert (r.mode, r.ion, r.energy) == ("quick", "Xe", 5400.0)
-    assert (r.mean_range, r.straggling) == (16430.0, 1651.0)
-    assert r.stopped_fraction() == pytest.approx((30000 - 137) / 30000, rel=1e-3)  # 137 个离子穿过了靶
+    assert (r.mode, r.ion, r.energy) == ("quick", "Ar", 2000.0)
+    assert (r.mean_range, r.straggling) == (15800.0, 1781.0)
+    assert r.stopped_fraction() == pytest.approx((10000 - 58) / 10000, rel=1e-3)  # 58 个离子穿过了靶
 
 
 def test_dpa_and_concentration_match_reference_scripts():
     """与 Damage.get_dpa、Concentration.get_concentration 的算法一致。"""
     v, r = read_vacancy(DATA / "VACANCY.txt"), read_range(DATA / "RANGE.txt")
-    phi, n = 1e16, 10.79e22
+    phi, n = 1e16, 9.643e22
     p = depth_profile(v, r, fluence=phi)
     table = v.frame()
     expected = phi * (table["Vacancies by ions"] + table["Vacancies by recoils"]) * 1e8 / n
@@ -116,9 +117,9 @@ def test_dpa_and_concentration_match_reference_scripts():
     assert np.allclose(p[IONS], c) and np.allclose(p[IONS_PERCENT], c / (c + n) * 100)
     assert np.allclose(p["Depth (nm)"], v.depth / 10)
     value, depth = peak(p)
-    assert value == pytest.approx(10.649, rel=1e-3) and depth == pytest.approx(1480.0)
+    assert value == pytest.approx(3.5356, rel=1e-3) and depth == pytest.approx(1280.0)
     assert centroid(p) == pytest.approx(r.mean_range / 10, rel=1e-3)  # 平均射程与文件头一致
-    assert p.attrs["ion"] == "Xe" and p.attrs["fluence"] == phi
+    assert p.attrs["ion"] == "Ar" and p.attrs["fluence"] == phi
     # 原子密度可以改；只有 RANGE.txt 时只算浓度
     assert np.allclose(depth_profile(v, fluence=phi, densities=2 * n)[DPA], expected / 2)
     only = depth_profile(ions=r, fluence=phi)
@@ -128,9 +129,9 @@ def test_dpa_and_concentration_match_reference_scripts():
 def test_decimal_comma():
     """某些区域设置下 SRIM 用小数逗号。"""
     text = (DATA / "VACANCY.txt").read_text(encoding="latin-1")
-    comma = parse_vacancy(text.replace(".E", ",E").replace("10.79E22", "10,79E22"))
+    comma = parse_vacancy(text.replace(".E", ",E").replace("9.643E22", "9,643E22"))
     assert np.allclose(comma.vacancies, read_vacancy(DATA / "VACANCY.txt").vacancies)
-    assert comma.layers[0].density == 10.79e22
+    assert comma.layers[0].density == 9.643e22
 
 
 # ============================================================
@@ -202,7 +203,7 @@ def test_profile_figure(tmp_path):
     p = depth_profile(read_vacancy(DATA / "VACANCY.txt"), read_range(DATA / "RANGE.txt"), fluence=1e16)
     _, (ax, ax_ions) = SRIMPlotter(font_size=7).plot_profile_static(p, depth_unit="um", show=False,
                                                                     save_path=tmp_path / "dpa.png", dpi=80)
-    assert ax.get_xlabel() == "Depth (μm)" and "Xe" in ax_ions.get_ylabel()
+    assert ax.get_xlabel() == "Depth (μm)" and "Ar" in ax_ions.get_ylabel()
     assert (tmp_path / "dpa.png").read_bytes()[:4] == b"\x89PNG"
     _, ax = SRIMPlotter().plot_profile_static(depth_profile(parse_vacancy(FULL_VACANCY), fluence=1e15),
                                                 elements=True, show=False)
