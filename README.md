@@ -13,7 +13,7 @@ OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据�
 | 数据分析 | 常用表征方法的数据分析，基于已经拟合好的结果 | XPS 拟合质量与分峰指标已完成 |
 | 计算 | 通用以及专用的物理量计算 | SRIM 损伤（dpa）与注入离子浓度、熔盐配比已完成 |
 | 结构化存储 | 把多个样品、多种表征方法的数据整理成一个项目文件（NetCDF），可导出 CSV / Excel | 已完成 |
-| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | XPS、Raman、XRD 和计算工具模块、中英文界面、自动备份、打包已完成 |
+| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | XPS、Raman、XRD 和计算工具模块、中英文界面、自动备份已完成；打包待实测 |
 
 ## 设计哲学
 
@@ -59,7 +59,7 @@ tests/                       # 测试
 
 ## 安装
 
-需要 Python 3.14 及以上，推荐使用 [uv](https://docs.astral.sh/uv/)：
+需要 Python 3.14 及以上，推荐使用 [uv](https://docs.astral.sh/uv/)（电脑上没有 Python 3.14 时，`uv sync` 会自动下载）。Windows、macOS、Linux 的命令相同：
 
 ```bash
 git clone https://github.com/AkiyamaSuguru/opengma.git
@@ -113,6 +113,8 @@ uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项�
 ```
 
 ## 打包
+
+> 打包还没有在三个系统上实测，下面的步骤供参考；平时在命令行中用 `uv run opengma` 运行即可。
 
 图形界面可以用 [flet build](https://flet.dev/docs/publish) 打包成不需要安装 Python 的程序：程序里带着自己的 Python 和全部依赖，Mac 上是 `OpenGMA.app`，Windows 上是带 `OpenGMA.exe` 的文件夹，Linux 上是带 `OpenGMA` 可执行文件的文件夹。设置、自动备份仍然在 `~/.opengma`，与从源码运行时相同。打包只能在对应的系统上进行（Mac 上打 Mac 的包，以此类推），三个系统用同一个脚本 `scripts/build_app.py`。
 
@@ -593,7 +595,8 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **XRD**：读取（Bruker D8 Advance 导出的 txt）和绘图已完成。
 - **结构化存储**：项目文件（NetCDF）、导入与清洗记录、CSV / Excel 导出已完成。
 - **计算**：SRIM 损伤（dpa）与注入离子浓度、熔盐配比已完成。
-- **UI**：启动器、工作区、项目总览，XPS、Raman、XRD 和计算工具模块，中英文界面、自动备份、项目锁、新建窗口和打包已完成。
+- **UI**：启动器、工作区、项目总览，XPS、Raman、XRD 和计算工具模块，中英文界面、自动备份、项目锁、新建窗口已完成，在命令行中用 `uv run opengma` 运行。
+- **打包**：打包脚本 `scripts/build_app.py` 和 GitHub Actions 已加入，三个系统上的打包还没有实测。
 - **其他表征方法的分析**：规划中。
 
 ## License
