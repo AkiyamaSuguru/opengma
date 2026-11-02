@@ -3,7 +3,8 @@
 """
 出版图：把界面上的选项翻译成 GMA Plotter 的参数，生成图片（方案 6.3）。
 
-- 只调用 GMA 已有的出版图函数（plot_element_static、plot_survey_static），预览就是导出的图片；
+- 只调用 GMA 已有的出版图函数（谱线图 plot_survey_static、plot_spectrum_static、plot_pattern_static，
+  拟合谱图 plot_element_static、plot_fit_static），预览就是导出的图片；
 - 字体：系统中没有所选字体时（如 Linux 上通常没有 Times New Roman），用随应用附带的、字宽相同的
   Liberation 字体代替；中文（如样品名）用随应用附带的 Noto Sans SC 显示（方案 11.2）；
 - 每次生成后关闭 matplotlib 的 figure，避免内存不断增长（方案 6.6）。
@@ -24,7 +25,9 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager
 
 from ...CM.common.style import DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, mpl_style
+from ...CM.Raman import RamanPlotter
 from ...CM.XPS import XPSPlotter
+from ...CM.XRD import XRDPlotter
 from ...project import Record
 from .spectra import Display, component_colors, overlay_colors, overlay_labels
 
@@ -43,12 +46,23 @@ FORMATS = ("png", "svg", "pdf", "tiff", "jpg")
 HTML = "html"  # 交互 HTML（plotly）
 LEGEND_LOCS = ("best", "upper right", "upper left", "lower left", "lower right", "center right", "center left",
                "upper center", "lower center")
-PLOTTERS = {"XPS": XPSPlotter}
+PLOTTERS = {"XPS": XPSPlotter, "Raman": RamanPlotter, "XRD": XRDPlotter}
+# 各方法的谱线图（可以叠加、标峰位）和拟合谱图（画分峰）；XRD 没有拟合谱图
+LINE_FUNCTIONS = {"XPS": "plot_survey_static", "Raman": "plot_spectrum_static", "XRD": "plot_pattern_static"}
+FIT_FUNCTIONS = {"XPS": "plot_element_static", "Raman": "plot_fit_static"}
+INTERACTIVE = {"plot_survey_static": "plot_survey_interactive", "plot_spectrum_static": "plot_spectrum_interactive",
+               "plot_pattern_static": "plot_pattern_interactive", "plot_element_static": "plot_element_interactive",
+               "plot_fit_static": "plot_fit_interactive"}
 # 交互图（plotly）接受的参数；出版图专用的参数（图例位置、子图等）不传
+_FIT_INTERACTIVE = {"component_colors", "component_mode", "raw_color", "raw_line_color", "fit_color", "bg_color",
+                    "component_alpha", "hide_y_ticks", "palette"}
+_LINE_INTERACTIVE = {"palette", "sample_colors", "peaks", "offset", "normalize", "hide_y_ticks"}
 INTERACTIVE_KWARGS = {
-    "plot_element_interactive": {"component_colors", "component_mode", "raw_color", "raw_line_color", "fit_color",
-                                 "bg_color", "component_alpha", "hide_y_ticks", "palette"},
-    "plot_survey_interactive": {"palette", "sample_colors", "offset", "normalize", "hide_y_ticks"},
+    "plot_element_interactive": _FIT_INTERACTIVE,
+    "plot_fit_interactive": _FIT_INTERACTIVE,
+    "plot_survey_interactive": _LINE_INTERACTIVE,
+    "plot_spectrum_interactive": _LINE_INTERACTIVE,
+    "plot_pattern_interactive": _LINE_INTERACTIVE | {"references", "phase_colors"},
 }
 
 
@@ -130,33 +144,60 @@ class PlotRequest:
 # ============================================================
 # 从界面状态生成 PlotRequest
 # ============================================================
+def uses_fit(record: Record) -> bool:
+    """这条谱图用拟合谱图函数画：XPS 元素谱（拟合与否都是），Raman 拟合谱；其余用谱线图函数。"""
+    if record.method == "XPS":
+        return record.kind == "element"
+    return record.fitted and record.method in FIT_FUNCTIONS
+
+
+def supports_marks(view: str, records: list[Record], options: FigureOptions | None = None) -> bool:
+    """这张图用谱线图函数画，可以标峰位（XRD 还可以标参考物相）。"""
+    if not records:
+        return False
+    if view == "overlay":
+        return True
+    if view == "side" and len(records) > 1:
+        return not (records[0].method in FIT_FUNCTIONS and any(uses_fit(r) for r in records))
+    return not uses_fit(records[0])
+
+
 def make_request(view: str, records: list[Record], displays: list[Display], options: FigureOptions,
-                 palette=None, *, normalize: bool = False, offset: float = 0.0) -> PlotRequest:
+                 palette=None, *, normalize: bool = False, offset: float = 0.0, peaks: dict | None = None,
+                 references: dict | None = None, phase_colors: dict | None = None) -> PlotRequest:
     """
     view：single（当前谱图）、overlay（叠加）、side（并排）。displays 与 records 一一对应。
+    peaks（{标签: 位置}）和 XRD 的 references（{物相名: {晶面指数: 2θ}}）、phase_colors 只用于谱线图。
     """
     if not records:
         raise ValueError("No spectrum to plot.")
     method = records[0].method
     style = {"show_legend": options.legend, "legend_loc": options.legend_loc,
              "hide_y_ticks": options.hide_y_ticks}
+    marks = {}
+    if peaks:
+        marks["peaks"] = dict(peaks)
+    if references and method == "XRD":
+        marks["references"] = {k: dict(v) for k, v in references.items()}
+        if phase_colors:
+            marks["phase_colors"] = dict(phase_colors)
+    line = LINE_FUNCTIONS[method]
 
     if view == "single" or len(records) == 1 and view != "overlay":
         record, display = records[0], displays[0]
-        if record.kind == "survey":
-            kwargs = dict(style)
-            if display.color:
-                kwargs["palette"] = [display.color]
-            return PlotRequest(method, "plot_survey_static", [record], [], kwargs,
-                               interactive="plot_survey_interactive")
-        kwargs = element_kwargs(record, display, palette, options)
-        return PlotRequest(method, "plot_element_static", [record], [], {**kwargs, **style},
-                           interactive="plot_element_interactive")
+        if uses_fit(record):
+            function = FIT_FUNCTIONS[method]
+            kwargs = {**element_kwargs(record, display, palette, options), **style}
+            return PlotRequest(method, function, [record], [], kwargs, interactive=INTERACTIVE[function])
+        kwargs = {**style, **marks}
+        if display.color:
+            kwargs["palette"] = [display.color]
+        return PlotRequest(method, line, [record], [], kwargs, interactive=INTERACTIVE[line])
 
     keys = overlay_labels(records)
     if view == "overlay":
         colors = overlay_colors(keys, displays, palette)
-        kwargs = {"sample_colors": dict(zip(keys, colors, strict=True)), **style}
+        kwargs = {"sample_colors": dict(zip(keys, colors, strict=True)), **style, **marks}
         if normalize:
             kwargs["normalize"] = True
         if offset and not options.subplots:
@@ -164,20 +205,25 @@ def make_request(view: str, records: list[Record], displays: list[Display], opti
         if options.subplots:
             kwargs["subplots"] = True
             kwargs["n_cols"] = n_cols(options, len(records))
-        return PlotRequest(method, "plot_survey_static", records, keys, kwargs,
+        return PlotRequest(method, line, records, keys, kwargs,
                            panels=len(records) if options.subplots else 1,
-                           interactive=None if options.subplots else "plot_survey_interactive")
+                           interactive=None if options.subplots else INTERACTIVE[line])
 
-    # 并排：每条元素谱一个子图
-    merged: dict[str, str] = {}
-    for record, display in zip(records, displays, strict=True):
-        for name, color in component_colors(record, display, palette).items():
-            merged.setdefault(name, color)
-    first = displays[0]
-    kwargs = {"component_colors": merged, "component_mode": records[0].component_mode,
-              "raw_color": first.raw_color, "fit_color": first.fit_color, "bg_color": first.bg_color,
-              "component_alpha": options.component_alpha, "n_cols": n_cols(options, len(records)), **style}
-    return PlotRequest(method, "plot_element_static", records, keys, kwargs, panels=len(records))
+    # 并排：每条谱一个子图。有拟合谱时用拟合谱图函数（分峰），否则用谱线图函数的子图
+    if method in FIT_FUNCTIONS and any(uses_fit(r) for r in records):
+        merged: dict[str, str] = {}
+        for record, display in zip(records, displays, strict=True):
+            for name, color in component_colors(record, display, palette).items():
+                merged.setdefault(name, color)
+        first = displays[0]
+        kwargs = {"component_colors": merged, "component_mode": records[0].component_mode,
+                  "raw_color": first.raw_color, "fit_color": first.fit_color, "bg_color": first.bg_color,
+                  "component_alpha": options.component_alpha, "n_cols": n_cols(options, len(records)), **style}
+        return PlotRequest(method, FIT_FUNCTIONS[method], records, keys, kwargs, panels=len(records))
+    colors = overlay_colors(keys, displays, palette)
+    kwargs = {"sample_colors": dict(zip(keys, colors, strict=True)), "subplots": True,
+              "n_cols": n_cols(options, len(records)), **style, **marks}
+    return PlotRequest(method, line, records, keys, kwargs, panels=len(records))
 
 
 def element_kwargs(record: Record, display: Display, palette, options: FigureOptions) -> dict:

@@ -25,8 +25,9 @@ from ...CM.common.data import (
 from ...CM.common.palette import assign_colors
 from ...project import Record
 
-# GMA 出版图的默认颜色：原始数据 black、拟合曲线 red、背景 gray（虚线）
+# GMA 出版图的默认颜色：原始数据 black、拟合曲线 red、背景 gray（虚线）；峰位标注为灰色虚线
 RAW_COLOR, FIT_COLOR, BG_COLOR = "#000000", "#FF0000", "#808080"
+PEAK_COLOR = "#808080"
 BG_DASH = [6, 4]
 VIEWS = ("single", "overlay", "side")
 MAX_SIDE = 6  # 并排视图最多几个小图（方案 6.2）
@@ -43,6 +44,16 @@ class Series:
     y: np.ndarray
     dash: list[int] | None = None
     width: float = 1.4
+
+
+@dataclass(frozen=True)
+class Mark:
+    """图上的一处标注：峰位表中的峰（灰色），或 XRD 参考物相的晶面（物相的颜色）。"""
+
+    x: float
+    label: str
+    color: str = PEAK_COLOR
+    dashed: bool = True
 
 
 @dataclass

@@ -18,3 +18,17 @@ class XPSView(MethodView):
     FILTERS = (("all", S.FILTER_ALL), ("survey", S.KIND_SURVEY), ("element", S.KIND_ELEMENT))
     SUFFIXES = (".xlsx", ".xls", ".xlsm")
     READERS = tuple(READERS)
+
+    def badge(self, record) -> str:
+        if record.kind == "survey":
+            return S.BADGE_SURVEY
+        return super().badge(record) if record.fitted else S.BADGE_UNFITTED
+
+    def kind_label(self, record) -> str:
+        if record.kind == "survey":
+            return S.KIND_SURVEY
+        return S.CHIP_FITTED if record.fitted else S.KIND_ELEMENT_RAW
+
+    def side_records(self, records):
+        """并排视图只放元素谱；只勾选了全谱时并排全谱。"""
+        return [r for r in records if r.kind != "survey"] or records

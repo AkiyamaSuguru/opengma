@@ -22,12 +22,14 @@ from .views import registry
 from .views.base import TabView
 from .views.module_view import ModuleView
 from .views.overview_view import OverviewView
+from .views.raman_view import RamanView
 from .views.registry import ModuleSpec
 from .views.xps_view import XPSView
+from .views.xrd_view import XRDView
 
 TAB_H, STRIP_H = 34, 42
-# 已经实现的模块页；其余模块（Raman、XRD 在 P4 中实现）先用占位页
-VIEW_CLASSES = {"xps": XPSView}
+# 各模块的页面；还没有实现的模块（如规划中的计算工具）用占位页
+VIEW_CLASSES = {"xps": XPSView, "raman": RamanView, "xrd": XRDView}
 
 
 @dataclass

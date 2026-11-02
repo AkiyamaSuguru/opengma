@@ -579,5 +579,90 @@ class Project:
             out[r.sample][r.method] = out[r.sample].get(r.method, 0) + 1
         return out
 
+    # ---------- 峰位表与参考物相（用户填写，GMA 不内置） ----------
+    def set_peak_table(self, name: str, rows) -> list[dict]:
+        """新建或替换一个峰位表：rows 为 [{"label": 标签, "position": 位置}, ...]，标签不能重复。"""
+        name = _check_name(name, "peak table")
+        self.peak_tables[name] = check_peak_rows(rows)
+        self.dirty = True
+        return self.peak_tables[name]
+
+    def rename_peak_table(self, old: str, new: str) -> None:
+        new = _check_name(new, "peak table")
+        if old not in self.peak_tables:
+            raise ProjectError(f"Peak table {old!r} not found.")
+        if new != old and new in self.peak_tables:
+            raise ProjectError(f"Peak table {new!r} already exists.")
+        self.peak_tables = {(new if k == old else k): v for k, v in self.peak_tables.items()}
+        self.dirty = True
+
+    def remove_peak_table(self, name: str) -> None:
+        if self.peak_tables.pop(name, None) is not None:
+            self.dirty = True
+
+    def peaks(self, name: str) -> dict[str, float]:
+        """峰位表写成 Plotter 的 peaks 参数：{标签: 位置}。"""
+        try:
+            rows = self.peak_tables[name]
+        except KeyError:
+            raise ProjectError(f"Peak table {name!r} not found.") from None
+        return {str(r["label"]): float(r["position"]) for r in rows}
+
+    def set_reference_phases(self, rows) -> list[dict]:
+        """替换参考物相表：rows 为 [{"phase": 物相名, "hkl": 晶面指数, "two_theta": 2θ}, ...]。"""
+        self.reference_phases = check_phase_rows(rows)
+        self.dirty = True
+        return self.reference_phases
+
+    def phase_names(self) -> list[str]:
+        return list(dict.fromkeys(r["phase"] for r in self.reference_phases))
+
+    def references(self, phases=None) -> dict[str, dict[str, float]]:
+        """参考物相写成 XRDPlotter 的 references 参数：{物相名: {晶面指数: 2θ}}；phases 为 None 时为全部物相。"""
+        out: dict[str, dict[str, float]] = {}
+        for r in self.reference_phases:
+            if phases is None or r["phase"] in phases:
+                out.setdefault(r["phase"], {})[r["hkl"]] = float(r["two_theta"])
+        return out
+
     def __len__(self) -> int:
         return len(self.records)
+
+
+def _number(value, what: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ProjectError(f"{what} must be a number, got {value!r}.") from None
+    if not np.isfinite(number):
+        raise ProjectError(f"{what} must be a finite number, got {value!r}.")
+    return number
+
+
+def check_peak_rows(rows) -> list[dict]:
+    """整理峰位表的行：标签不能为空、不能重复，位置为数值。"""
+    out, seen = [], set()
+    for i, row in enumerate(rows or [], start=1):
+        label = str(row.get("label", "")).strip()
+        if not label:
+            raise ProjectError(f"Peak table row {i}: the label is empty.")
+        if label in seen:
+            raise ProjectError(f"Peak table row {i}: duplicate label {label!r}.")
+        seen.add(label)
+        out.append({"label": label, "position": _number(row.get("position"), f"Peak table row {i}: position")})
+    return out
+
+
+def check_phase_rows(rows) -> list[dict]:
+    """整理参考物相表的行：物相名、晶面指数不能为空，同一物相中晶面指数不能重复，2θ 为数值。"""
+    out, seen = [], set()
+    for i, row in enumerate(rows or [], start=1):
+        phase, hkl = str(row.get("phase", "")).strip(), str(row.get("hkl", "")).strip()
+        if not phase or not hkl:
+            raise ProjectError(f"Reference phase row {i}: the phase name and hkl must not be empty.")
+        if (phase, hkl) in seen:
+            raise ProjectError(f"Reference phase row {i}: duplicate {hkl} for {phase!r}.")
+        seen.add((phase, hkl))
+        out.append({"phase": phase, "hkl": hkl,
+                    "two_theta": _number(row.get("two_theta"), f"Reference phase row {i}: 2θ")})
+    return out

@@ -9,7 +9,8 @@
 - 鼠标滚轮缩放；触控板捏合、双指上下滑缩放，双指左右滑平移；按住鼠标拖动平移；双击复位。
   Flutter 把触控板手势当作缩放手势，三个系统用同一套处理；
 - 悬停读数由这里根据指针位置计算（离指针最近的数据点），画竖线、圆点和提示框，并交给状态栏；
-- XPS 横轴从高到低：图表内部用 −x 作横坐标，刻度标签显示原来的数值。
+- XPS 横轴从高到低：图表内部用 −x 作横坐标，刻度标签显示原来的数值；
+- 峰位表、XRD 参考物相画成竖线，标签写在图的顶部，与出版图一致；缩放、平移时只重画这些标注。
 
 默认显示全部数据点，不抽稀；设置中打开“抽稀显示”后只影响显示，悬停读数仍然用全部数据。
 """
@@ -24,6 +25,7 @@ import numpy as np
 
 from .. import theme as th
 from ..services.spectra import (
+    Mark,
     Series,
     data_range,
     decimate,
@@ -32,6 +34,7 @@ from ..services.spectra import (
     ticks,
     y_range,
 )
+from ..services.text import unit
 from ..strings import S
 from ..theme import Palette
 
@@ -63,7 +66,7 @@ class SpectrumChart:
     """
 
     def __init__(self, p: Palette, *, compact: bool = False, on_range=None, on_hover=None, on_toggle=None,
-                 max_points: int = 0, title: str = ""):
+                 max_points: int = 0, title: str = "", size: tuple[float, float] | None = None, on_resize=None):
         self.p = p
         self.compact = compact
         self.on_range = on_range
@@ -76,11 +79,16 @@ class SpectrumChart:
         self.reversed = False
         self.x_label = ""
         self.y_label = ""
+        self.x_unit = ""
+        self.marks: list[Mark] = []
         self.xmin, self.xmax = 0.0, 1.0
         self.lo, self.hi = 0.0, 1.0
         self.ylo, self.yhi = 0.0, 1.0
         self.y_fixed: tuple[float, float] | None = None
-        self.w, self.h = 600.0, 360.0
+        # 绘图区的尺寸：由 on_size_change 得到。换成同样大小的新图时 Flet 不再报告尺寸，
+        # 所以由外面传入上一张图的尺寸（size），尺寸变化时通过 on_resize 告诉外面
+        self.w, self.h = size or (600.0, 360.0)
+        self.on_resize = on_resize
         self._last = 0.0
         self._pinch = 1.0
         self._acc = [0.0, 0.0, 1.0]  # 触控板手势累积的 dx、dy、缩放
@@ -89,6 +97,7 @@ class SpectrumChart:
         font = 10 if compact else 10.5
         self.font = font
         self.grid = ft.Stack(expand=True)
+        self.mark_layer = ft.Stack(expand=True)  # 峰位、参考物相的竖线和标签，在曲线下面
         self.overlay = ft.Stack(expand=True)
         self.holder = ft.Container(expand=True)
         self.y_axis = ft.Stack(width=AXIS_W, clip_behavior=ft.ClipBehavior.NONE)
@@ -106,7 +115,7 @@ class SpectrumChart:
             on_hover=self._on_hover_move, on_exit=self._on_exit, on_double_tap=lambda e: self.reset(),
             hover_interval=30, expand=True, mouse_cursor=ft.MouseCursor.PRECISE,
             content=ft.Container(
-                content=ft.Stack([self.grid, self.holder, self.overlay], expand=True),
+                content=ft.Stack([self.grid, self.mark_layer, self.holder, self.overlay], expand=True),
                 clip_behavior=ft.ClipBehavior.HARD_EDGE, expand=True, bgcolor=p.panel,
                 border=ft.Border.all(1, self.axis_color), on_size_change=self._on_size, size_change_interval=60))
         self.control = self._layout()
@@ -161,11 +170,14 @@ class SpectrumChart:
         return -x if self.reversed else x
 
     def set_data(self, series: list[Series], *, x_label: str, y_label: str = "Intensity (a.u.)",
-                 reversed: bool = False, x_range=None, y_fixed=None, hidden=()) -> None:
+                 reversed: bool = False, x_range=None, y_fixed=None, hidden=(), x_unit: str = "",
+                 marks: list[Mark] | None = None) -> None:
         """换一组曲线：所有数据点只在这里发送一次。"""
         self.series = series
         self.reversed = reversed
         self.x_label, self.y_label = x_label, y_label
+        self.x_unit = unit(x_unit)
+        self.marks = list(marks or [])
         self.x_title.value, self.y_title.value = x_label, y_label
         self.hidden = {k for k in hidden if any(s.key == k for s in series)}
         self.xmin, self.xmax = data_range(series)
@@ -240,6 +252,27 @@ class SpectrumChart:
             yl.append(ft.Container(top=py - 8, right=6, content=ft.Text(
                 format_value(v, yd if yd else 0), size=self.font, color=p.muted)))
         self.grid.controls, self.x_axis.controls, self.y_axis.controls = grid, xl, yl
+        self._draw_marks()
+
+    def _draw_marks(self) -> None:
+        """峰位、参考物相：竖线和顶部的标签，只画在横轴范围内的。"""
+        controls = []
+        for m in self.marks:
+            if not self.lo <= m.x <= self.hi:
+                continue
+            px = self._px(m.x)
+            color = self.shown_color(m.color)
+            controls.append(ft.Container(left=px, top=0, bottom=0, width=1,
+                                         bgcolor=ft.Colors.with_opacity(0.75, color)))
+            controls.append(ft.Container(
+                left=px + 3, top=2, content=ft.Text(m.label, size=self.font - 0.5, color=color, no_wrap=True)))
+        self.mark_layer.controls = controls
+
+    def set_marks(self, marks: list[Mark]) -> None:
+        """换标注（峰位表、参考物相）：不重新发送数据点。"""
+        self.marks = list(marks)
+        self._draw_marks()
+        self.mark_layer.update()
 
     def _draw_legend(self) -> None:
         if self.compact:
@@ -279,7 +312,7 @@ class SpectrumChart:
         self._draw_axes()
         self._sync_slider()
         self.overlay.controls = []
-        for c in (self.grid, self.x_axis, self.y_axis, self.overlay, self.chart):
+        for c in (self.grid, self.mark_layer, self.x_axis, self.y_axis, self.overlay, self.chart):
             c.update()
         if not self.compact:
             for c in (self.slider, self.lo_text, self.hi_text):
@@ -323,8 +356,10 @@ class SpectrumChart:
     # ============================================================
     def _on_size(self, e: ft.LayoutSizeChangeEvent) -> None:
         self.w, self.h = max(e.width, 50), max(e.height, 50)
+        if self.on_resize:
+            self.on_resize(self.w, self.h)
         self._draw_axes()
-        for c in (self.grid, self.x_axis, self.y_axis):
+        for c in (self.grid, self.mark_layer, self.x_axis, self.y_axis):
             c.update()
 
     def _throttled(self) -> bool:
@@ -433,8 +468,7 @@ class SpectrumChart:
             self.on_hover(text)
 
     def _fmt_readout_x(self, x: float) -> str:
-        unit = self.x_label.rsplit("(", 1)[-1].rstrip(")") if "(" in self.x_label else ""
-        return f"{x:.2f} {unit}".strip()
+        return f"{x:.2f} {self.x_unit}".strip()
 
     def _draw_readout(self, px, x, rows, marks, py) -> None:
         p = self.p
