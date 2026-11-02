@@ -2,7 +2,9 @@
 
 > **本项目正在开发中**，接口可能还会调整。
 
-OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据分析工具集。它把科研中表征数据的读取、分析、绘图等环节整理成一个可以复用的 Python 库，目前已支持 **XPS、Raman、XRD** 的数据读取和绘图。
+OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据分析工具集。它把科研中表征数据的读取、分析、绘图等环节整理成一个可以复用的 Python 库，目前支持 **XPS、Raman、XRD** 的数据读取和绘图、SRIM 辐照损伤（dpa）和熔盐配比的计算，并可以把多个样品、多种表征方法的数据整理成一个项目文件。不熟悉 Python 的使用者可以用[图形界面](#图形界面)完成同样的工作。
+
+想修改或扩展本项目（接入新的仪器、增加表征方法或计算工具、改图形界面），请看[开发者手册](NoteBooks/开发者笔记/README.md)。
 
 ## 功能
 
@@ -22,6 +24,8 @@ OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据�
 项目按表征方法组织代码，因为同一种表征方法的处理通常有共性，最终使用的数据结构相同或相似，这让数据输入的标准化成为可能。不同表征方法的谱图结构也很接近，主要区别在横轴，所以它们共用 `common` 中的一套绘图实现，每种表征方法只规定自己的数据结构和横轴。
 
 目前支持的表征方法主要是作者用过的表征手段，也期待有新的开发者加入，一起完善本项目。由于项目还未开发完成，目前以具有传染性的开源协议发布，后续可能会考虑改用 MIT 等协议，取消强制开源的传递性，方便使用。
+
+完整的思路（从原始数据到科学结论的数据流水线）见开发者手册中的[设计哲学](NoteBooks/开发者笔记/设计哲学.md)。
 
 ## 目录结构
 
@@ -44,18 +48,23 @@ src/GMA/
 │   ├── SRIM/                # 读取 TRIM 的 VACANCY.txt、RANGE.txt，计算 dpa 和注入离子浓度
 │   └── Salts/               # 熔盐配比：按摩尔分数和总质量计算各盐的质量
 ├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
-├── UI/                      # 图形界面（Flet）：启动器、工作区、项目总览、设置；strings.py、strings_en.py 是中英文界面文字
-│   ├── views/               # 工作区中的页面：项目总览、各模块页（三栏模板），以及模块注册表
+├── UI/                      # 图形界面（Flet）：启动器、工作区、设置；strings.py、strings_en.py 是中英文界面文字
+│   ├── views/               # 工作区中的页面：项目总览、表征方法页（三栏模板）、计算工具页，以及模块注册表
 │   ├── components/          # 交互图、导入和出版图等对话框、通用小部件
-│   ├── services/            # 不依赖界面的部分：曲线整理、出版图、复制为代码、分析、导入
+│   ├── services/            # 不依赖 flet 的部分：曲线整理、出版图、复制为代码、分析、导入、自动备份、项目锁
 │   └── assets/              # 图标、随应用附带的开源字体
 └── utils/
 src/main.py                  # 打包（flet build）时的程序入口
-scripts/build_app.py         # 打包脚本，本机和 GitHub Actions 共用
+scripts/
+├── build_app.py             # 打包脚本，本机和 GitHub Actions 共用
+├── ui_p0/                   # 开发图形界面前的技术验证及结果（RESULTS.md）
+└── ui_p2/                   # 生成演示项目的脚本 demo_project.py
+.github/workflows/           # GitHub Actions：build-app.yml 在三个系统上打包并自检
+NoteBooks/开发者笔记/        # 开发者手册
 tests/                       # 测试
 ```
 
-每种表征方法下设读取（loader）、分析（analyzer）、绘图（plotter）入口，具体实现放在以表征方法首字母命名的 `[X]Loader`、`[X]Analyzer`、`[X]Plotter` 子文件夹中（XRD 取 Diffraction 的 D）。
+每种表征方法下设读取（loader）、分析（analyzer）、绘图（plotter）入口，具体实现放在以表征方法首字母命名的 `[X]Loader`、`[X]Analyzer`、`[X]Plotter` 子文件夹中（XRD 取 Diffraction 的 D）。各模块的详细说明见[开发者手册](#开发者手册)。
 
 ## 安装
 
@@ -83,6 +92,14 @@ uv run opengma            # 或者 uv run python -m GMA.UI
 
 启动后先显示启动器：点击模块卡片新建项目，或者打开最近的项目。工作区按标签组织，固定在最左边的“项目”标签是项目总览，包括样品表（样品信息的字段由你定义，单击单元格编辑）、数据检查（导入时的清洗记录、各样品分峰名不一致）和导出（Excel / CSV）。
 
+想先看看界面，可以生成一个演示项目，再在启动器中用“打开项目…”打开它：
+
+```bash
+uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项目.nc（模拟数据）
+```
+
+### 表征方法模块
+
 XPS、Raman、XRD 三个模块使用同一个三栏页面：
 
 - **左栏：数据**。导入仪器导出的文件或整个文件夹（文件夹名作样品名、文件名作谱图名），也可以导入其他软件导出的表格（CSV、TSV、TXT，由你指定哪一列是横轴、强度、拟合曲线、背景和分峰）。导入前在对话框中确认识别结果、分峰名和清洗报告。谱图按样品分组，可以搜索、筛选，单击查看，勾选后叠加或并排。
@@ -91,10 +108,14 @@ XPS、Raman、XRD 三个模块使用同一个三栏页面：
 - **峰位表、参考物相**：由你填写，保存在项目中，各模块共用，也可以导入导出 CSV；GMA 不内置任何峰位或物相。
 - **出版图**：用 GMA 的出版图函数生成，预览就是导出的效果；可以调尺寸、字体、字号、图例、分峰填充等，导出 PNG、SVG、PDF、TIFF、JPG，或交互 HTML。“复制为代码”生成一段 GMA 代码，粘贴到 marimo 中就能得到同样的图。
 
+### 计算工具
+
 计算工具也在工作区中，以标签的形式打开，输入随项目保存：
 
 - **SRIM · dpa**：选择 TRIM 输出的 VACANCY.txt 和 / 或 RANGE.txt（按内容识别，同一文件夹中的另一个文件也会一起读），Quick K-P 和 Full Cascade 都可以，多层靶各层用自己的原子密度。输入注量，或束流 × 时间；原子密度取自文件头，可以修改。图中是 dpa 或注入离子浓度随深度的分布（Full Cascade 还可以按元素显示），右侧是峰值、所在深度、指定深度范围内的平均值、平均射程和留在靶中的离子比例。可以导出 Excel / CSV、复制为代码、生成出版图。文件内容保存在项目中，换一台电脑打开项目也能看到。
 - **熔盐配比**：从内置的组成（FLiNaK、FLiBe、NaCl-KCl、LiCl-KCl、NaCl-MgCl2、KCl-MgCl2）开始，可以修改、保存为自己的预设，也可以恢复内置的预设（保存在设置中）。按摩尔分数（或任意比例）和总质量算出每种盐的质量；摩尔质量按化学式和 IUPAC 标准原子量计算，同位素富集的盐（如 ⁷LiF）可以直接填写摩尔质量。结果可以复制成表格粘贴到 Excel 或实验记录中，也可以导出或复制为代码。
+
+### 设置、备份与快捷键
 
 - 设置保存在 `~/.opengma/settings.json`（可以用环境变量 `OPENGMA_HOME` 改到别处），包括主题、主题色、界面语言、窗口大小和最近项目。
 - **界面语言**：设置 → 常规 → 界面语言，中文或 English，重新启动后生效（设置中可以直接重新启动）。
@@ -106,17 +127,11 @@ XPS、Raman、XRD 三个模块使用同一个三栏页面：
 - Linux 上的文件对话框需要系统中装有 `zenity`。
 - 界面自带开源字体 Noto Sans SC（SIL Open Font License 1.1），Windows、macOS、Linux 上显示一致，不依赖系统中装有中文字体。出版图默认用 Times New Roman，系统中没有时用附带的、字宽相同的 Liberation Serif 代替（Arial 用 Liberation Sans 代替），图中的中文用 Noto Sans SC。
 
-想先看看界面，可以生成一个演示项目，再在启动器中用“打开项目…”打开它：
-
-```bash
-uv run python scripts/ui_p2/demo_project.py   # 生成 scripts/ui_p2/演示项目.nc（模拟数据）
-```
-
 ## 打包
 
 > 打包已在 GitHub Actions 的 macOS、Windows、Linux 机器上通过（能打包，打包好的程序能启动并通过自检），还没有在日常使用的电脑上手动试过。平时在命令行中用 `uv run opengma` 运行即可。
 
-图形界面可以用 [flet build](https://flet.dev/docs/publish) 打包成不需要安装 Python 的程序：程序里带着自己的 Python 和全部依赖，Mac 上是 `OpenGMA.app`，Windows 上是带 `OpenGMA.exe` 的文件夹，Linux 上是带 `OpenGMA` 可执行文件的文件夹。设置、自动备份仍然在 `~/.opengma`，与从源码运行时相同。打包只能在对应的系统上进行（Mac 上打 Mac 的包，以此类推），三个系统用同一个脚本 `scripts/build_app.py`。
+图形界面可以用 [flet build](https://flet.dev/docs/publish) 打包成不需要安装 Python 的程序：程序里带着自己的 Python 和全部依赖，Mac 上是 `OpenGMA.app`，Windows 上是带 `OpenGMA.exe` 的文件夹，Linux 上是带 `OpenGMA` 可执行文件的文件夹。设置、自动备份仍然在 `~/.opengma`，与从源码运行时相同。打包只能在对应的系统上进行（Mac 上打 Mac 的包，以此类推），三个系统用同一个脚本 `scripts/build_app.py`，它的工作方式见[开发流程 · 打包](NoteBooks/开发者笔记/开发流程.md#打包)。
 
 ### 在自己的电脑上打包（以 Mac 为例）
 
@@ -588,6 +603,27 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 
 未拟合的元素谱与全谱结构相同。拟合谱中，标准列以外的数值列都视为分峰列，列名就是图例中的分峰名，可以有 0 个或多个。Raman 和 XRD 的 reader 返回 `(df, metadata)`，metadata 保存仪器、测试参数等信息；XPS 的 reader 只返回 df。自己整理数据时，列名也可以从 `schema.py` 导入，如 `from GMA.CM.Raman.schema import SHIFT_COL`。
 
+## 开发者手册
+
+想修改或扩展 OpenGMA 时，先看[开发者手册](NoteBooks/开发者笔记/README.md)。它介绍各模块的代码组织和设计上的约定，并按任务说明要改哪些地方。
+
+| 章节 | 内容 |
+| --- | --- |
+| [设计哲学](NoteBooks/开发者笔记/设计哲学.md) | 为什么这样设计：从原始数据到科学结论的数据流水线 |
+| [开发流程](NoteBooks/开发者笔记/开发流程.md) | 开发环境、运行与测试、代码约定、分支与 PR、打包与 GitHub Actions |
+| [CM 模块](NoteBooks/开发者笔记/CM模块.md) | 表征方法：标准数据结构，Loader、Analyzer、Plotter |
+| [project 模块](NoteBooks/开发者笔记/project模块.md) | 结构化存储：数据模型、清洗、NetCDF 项目文件、导入与导出 |
+| [SC 模块](NoteBooks/开发者笔记/SC模块.md) | 模拟与计算：SRIM 的文件格式与公式、熔盐配比 |
+| [UI 模块](NoteBooks/开发者笔记/UI模块.md) | 图形界面：窗口与会话、模块注册表、页面、界面文字与翻译、自动备份与项目锁 |
+
+常见任务从这里看起：
+
+- 读取一台新仪器的文件：[接入新的仪器](NoteBooks/开发者笔记/CM模块.md#接入新的仪器)；
+- 增加一种表征方法（如 FTIR）：依次看 [CM](NoteBooks/开发者笔记/CM模块.md#增加表征方法)、[project](NoteBooks/开发者笔记/project模块.md#增加表征方法)、[UI](NoteBooks/开发者笔记/UI模块.md#增加一个表征方法模块) 中的对应小节；
+- 增加一个计算工具：[SC 模块 · 增加计算](NoteBooks/开发者笔记/SC模块.md#增加计算)，界面见 [UI 模块 · 增加一个计算工具](NoteBooks/开发者笔记/UI模块.md#增加一个计算工具)；
+- 修改界面文字或增加翻译：[界面文字与翻译](NoteBooks/开发者笔记/UI模块.md#界面文字与翻译)；
+- 运行测试、提交代码、打包：[开发流程](NoteBooks/开发者笔记/开发流程.md)。
+
 ## 开发进度
 
 - **XPS**：读取（Thermo Fisher Avantage 导出的 Excel，测试仪器 ESCALAB Xi+）、分析（拟合质量与分峰指标）和绘图已完成。
@@ -597,6 +633,7 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 - **计算**：SRIM 损伤（dpa）与注入离子浓度、熔盐配比已完成。
 - **UI**：启动器、工作区、项目总览，XPS、Raman、XRD 和计算工具模块，中英文界面、自动备份、项目锁、新建窗口已完成，在命令行中用 `uv run opengma` 运行。
 - **打包**：打包脚本 `scripts/build_app.py` 和 GitHub Actions 已加入，在 GitHub 的 macOS、Windows、Linux 机器上都能打包并通过自检；还没有在日常使用的电脑上手动试过，也还没有签名。
+- **文档**：使用方法见本 README，开发说明见[开发者手册](#开发者手册)。
 - **其他表征方法的分析**：规划中。
 
 ## License
