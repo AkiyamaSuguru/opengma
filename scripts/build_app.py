@@ -62,13 +62,13 @@ def output_dir(target: str) -> Path:
     return ROOT / "build" / target
 
 
-def annotate(title: str, lines) -> None:
-    """GitHub Actions 中把出错的信息写成注释，在运行结果的摘要中就能看到（本机运行时不输出）。"""
+def annotate(title: str, lines, level: str = "error") -> None:
+    """GitHub Actions 中把信息写成注释（出错时为 error），在运行结果的摘要中就能看到；本机运行时不输出。"""
     if not IN_CI:
         return
     text = "\n".join(lines)[-6000:]
     escaped = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-    print(f"::error title={title}::{escaped}", flush=True)
+    print(f"::{level} title={title}::{escaped}", flush=True)
 
 
 def check_host(target: str) -> None:
@@ -214,6 +214,9 @@ def smoke(args) -> None:
         annotate(f"Smoke test of the {args.target} app failed", details)
         sys.exit("Self-check failed.")
     print("Smoke test passed: the packaged app runs with its own Python.", flush=True)
+    annotate(f"Smoke test of the {args.target} app passed",
+             [f"{key}: {result.get(key)}" for key in ("python", "executable", "prefix", "platform", "embedded",
+                                                       "window")], level="notice")
 
 
 def main() -> None:
