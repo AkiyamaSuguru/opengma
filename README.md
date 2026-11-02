@@ -640,7 +640,7 @@ export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条
 
 **Only the code is open source.** Everything else (the author's name and personal information, the design and the content) is reserved.
 
-- **Code: [GNU AGPL-3.0](LICENSE) (`AGPL-3.0-only`), a strong copyleft license.** The Python package in `src/`, `main.py`, the notebooks in `NoteBooks/` and the project files. You may use, study, change and share it. If you share a changed version, or run one as a network service (a web app or an online analysis tool, for example), you must offer its full source code under the same license to everyone who receives it or uses it over the network, keep the copyright and license notices, and mark your changes. It comes with no warranty.
+- **Code: [GNU AGPL-3.0](LICENSE) (`AGPL-3.0-only`), a strong copyleft license.** The Python package in `src/`, the notebooks in `NoteBooks/` and the project files. You may use, study, change and share it. If you share a changed version, or run one as a network service (a web app or an online analysis tool, for example), you must offer its full source code under the same license to everyone who receives it or uses it over the network, keep the copyright and license notices, and mark your changes. It comes with no warranty.
 - **Reserved: the author's name and personal information.** Jay Ma (AkiyamaSuguru) and any details about the author.
 - **Reserved: design.** The author's emblem in every form, all icons, and every logo, ornament, illustration and other design element, in whatever form and wherever it appears, including any added to this repository later.
 - **Reserved: content.** The text of this README and any other content that is not code, such as documents, images and data.
@@ -654,7 +654,7 @@ If you build on the code, replace everything reserved with your own. To ask for 
 
 **本项目只开源代码**。除代码以外的一切（作者的姓名与个人信息、设计与内容）均保留所有权利。
 
-- **代码：[GNU AGPL-3.0](LICENSE)（`AGPL-3.0-only`），强 Copyleft 许可证**。包括 `src/` 中的 Python 包、`main.py`、`NoteBooks/` 中的笔记本以及项目文件。可以使用、研究、修改与分享；分享修改后的版本，或将其作为网络服务（例如网页应用或在线分析工具）运行时，必须以同一许可证向获得它或通过网络使用它的所有人提供全部源代码，保留版权与许可声明，并注明所作的修改。本软件不提供任何担保。
+- **代码：[GNU AGPL-3.0](LICENSE)（`AGPL-3.0-only`），强 Copyleft 许可证**。包括 `src/` 中的 Python 包、`NoteBooks/` 中的笔记本以及项目文件。可以使用、研究、修改与分享；分享修改后的版本，或将其作为网络服务（例如网页应用或在线分析工具）运行时，必须以同一许可证向获得它或通过网络使用它的所有人提供全部源代码，保留版权与许可声明，并注明所作的修改。本软件不提供任何担保。
 - **保留**：作者的姓名与个人信息；作者徽标的一切形式、所有图标及其他一切设计元素（包括今后加入本仓库的）；本说明的文字以及其他非代码内容，如文档、图片与数据。
 - **第三方字体**：`src/GMA/UI/assets/fonts/` 中的字体（Noto Sans SC，© Adobe；Liberation Serif、Liberation Sans，© Google、Red Hat）不是作者的作品，不在保留之列，按 SIL Open Font License 1.1 分发，见该文件夹中的许可证文件和 `README.md`。
 
