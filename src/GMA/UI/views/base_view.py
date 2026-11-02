@@ -17,10 +17,18 @@ from pathlib import Path
 
 import flet as ft
 
-from ...project import ProjectError, export_csv, export_excel
+from ...CM.common.palette import assign_colors
+from ...project import (
+    GENERIC_READER,
+    ProjectError,
+    export_csv,
+    export_excel,
+    read_table,
+)
 from .. import theme as th
 from ..components import widgets as w
 from ..components.chart import SpectrumChart
+from ..components.columns_dialog import ColumnsDialog
 from ..components.data_panel import DataPanel
 from ..components.data_table import DataTable
 from ..components.dialogs import (
@@ -33,19 +41,24 @@ from ..components.dialogs import (
 from ..components.figure_dialog import FigureDialog
 from ..components.import_dialog import ImportDialog
 from ..components.inspector import Inspector
+from ..components.tables_dialog import PeakTablesDialog, PhasesDialog
 from ..services import analysis, codegen, figures, importing
 from ..services.figures import FigureOptions
 from ..services.spectra import (
     MAX_SIDE,
+    PEAK_COLOR,
     VIEWS,
     Display,
+    Mark,
     component_colors,
+    is_color,
     overlay_colors,
     overlay_labels,
     overlay_series,
     point_counts,
     single_series,
 )
+from ..services.text import plain_label
 from ..strings import S
 from .base import TabView
 from .registry import ModuleSpec
@@ -55,10 +68,28 @@ NARROW_RIGHT, NARROW_LEFT = 1080, 820  # 窗口内容宽度小于这些值时自
 
 
 class MethodView(TabView):
-    # 子类设置：左栏的类型筛选、可以导入的文件后缀、读取器（第一个为默认）
+    # 子类设置：左栏的类型筛选、可以导入的文件后缀、读取器（第一个为默认）、是否有参考物相（XRD）
     FILTERS: tuple[tuple[str, str], ...] = (("all", S.FILTER_ALL),)
     SUFFIXES: tuple[str, ...] = ()
     READERS: tuple[str, ...] = ()
+    PHASES = False
+
+    # ---------- 子类可以改写：类型筛选、左栏标签、标题旁的类型 ----------
+    def matches(self, record, key: str) -> bool:
+        """左栏的类型筛选：key 为 FILTERS 中的键，"all" 以外默认按数据类型（record.kind）。"""
+        return key == "all" or record.kind == key
+
+    def badge(self, record) -> str:
+        """左栏条目右侧的小标签。"""
+        return S.BADGE_FITTED.format(n=len(record.components)) if record.fitted else S.BADGE_RAW
+
+    def kind_label(self, record) -> str:
+        """标题旁的数据类型。"""
+        return S.CHIP_FIT if record.fitted else S.CHIP_LINE
+
+    def side_records(self, records):
+        """并排视图中显示的谱图（XPS 只并排元素谱）。"""
+        return records
 
     def __init__(self, app, session, workspace, spec: ModuleSpec, state: dict):
         super().__init__(app, session, workspace)
@@ -70,6 +101,8 @@ class MethodView(TabView):
         self.inspector = Inspector(self)
         self.table = DataTable(self, self.st["table"])
         self.chart: SpectrumChart | None = None
+        self.plot_size: tuple[float, float] | None = None      # 上一张交互图的绘图区尺寸
+        self.compact_size: tuple[float, float] | None = None   # 并排小图的绘图区尺寸
         self.center = ft.Container(expand=True)
         self.points_text = ft.Text("", size=th.SIZE_SMALL, color=app.p.faint)
         self.left = ft.Container()
@@ -95,6 +128,10 @@ class MethodView(TabView):
         st["inspector"] = st.get("inspector") if st.get("inspector") in ("display", "analysis", "info") else "display"
         st["table"] = st.get("table") if isinstance(st.get("table"), dict) else {}
         st["figure"] = st.get("figure") if isinstance(st.get("figure"), dict) else {}
+        st["peak_table"] = st.get("peak_table") if isinstance(st.get("peak_table"), str) else None
+        st["hidden_phases"] = [str(x) for x in st.get("hidden_phases") or []]
+        colors = st.get("phase_colors") if isinstance(st.get("phase_colors"), dict) else {}
+        st["phase_colors"] = {str(k): v for k, v in colors.items() if is_color(v)}
         st["left"] = st.get("left", True) is not False
         st["right"] = st.get("right", True) is not False
         return st
@@ -139,7 +176,7 @@ class MethodView(TabView):
         st, query = self.st, self.st["search"].casefold()
         out = []
         for r in self.records():
-            if st["filter"] != "all" and r.kind != st["filter"]:
+            if not self.matches(r, st["filter"]):
                 continue
             if st["sample"] and r.sample != st["sample"]:
                 continue
@@ -181,8 +218,7 @@ class MethodView(TabView):
             return [current] if current else []
         records = self.checked_records() or ([current] if current else [])
         if self.view_mode == "side":
-            records = [r for r in records if r.kind != "survey"] or records
-            return records[:MAX_SIDE]
+            return self.side_records(records)[:MAX_SIDE]
         return records
 
     def display(self, rid: str) -> Display:
@@ -307,13 +343,7 @@ class MethodView(TabView):
                               wrap=True), views], vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
     def kind_chip(self, record) -> ft.Control:
-        if record.kind == "survey":
-            text = S.KIND_SURVEY
-        elif record.fitted:
-            text = S.CHIP_FITTED
-        else:
-            text = S.KIND_ELEMENT_RAW
-        return w.chip(text, self.p)
+        return w.chip(self.kind_label(record), self.p)
 
     def toolbar(self) -> ft.Control:
         p, page = self.p, self.app.page
@@ -371,33 +401,42 @@ class MethodView(TabView):
         if self.view_mode == "side" and len(records) > 1:
             self.chart = None
             charts = []
-            for r in records:
+            colors = self.curve_colors(records)
+            marks = self.chart_marks(records, colors)
+            for r, color in zip(records, colors, strict=True):
                 d = self.display(r.record_id)
+                if not r.fitted:  # 未拟合的谱用叠加时的颜色，与出版图的子图一致
+                    d = d.copy()
+                    d.color = color
                 chart = SpectrumChart(p, compact=True, title=f"{r.name} · {r.sample}", max_points=self.max_points(),
                                       on_hover=self.on_hover, on_range=lambda lo, hi, rid=r.record_id:
-                                      self.remember_range(rid, lo, hi))
-                chart.set_data(single_series(r, d, self.palette), x_label=axis.label, reversed=axis.reversed,
-                               x_range=d.x_range, y_fixed=d.y_range if d.y_mode == "fixed" else None,
-                               hidden=d.hidden)
+                                      self.remember_range(rid, lo, hi), size=self.compact_size,
+                                      on_resize=lambda w, h: setattr(self, "compact_size", (w, h)))
+                chart.set_data(single_series(r, d, self.palette), x_label=plain_label(axis.label),
+                               reversed=axis.reversed, x_range=d.x_range, y_fixed=d.y_range if d.y_mode == "fixed" else None,
+                               hidden=d.hidden, x_unit=r.spec.x_unit, marks=marks)
                 charts.append(ft.Container(content=chart.control, col={"xs": 12, "md": 6, "xl": 4}, height=300))
             self.points_text.value = ""
             return ft.Column([ft.ResponsiveRow(charts, spacing=12, run_spacing=12)], scroll=ft.ScrollMode.AUTO,
                              expand=True)
         chart = SpectrumChart(p, max_points=self.max_points(), on_range=self.on_chart_range, on_hover=self.on_hover,
-                              on_toggle=self.on_toggle)
+                              on_toggle=self.on_toggle, size=self.plot_size,
+                              on_resize=lambda w, h: setattr(self, "plot_size", (w, h)))
         if self.view_mode == "overlay":
             o = self.st["overlay"]
             series = overlay_series(records, [self.display(r.record_id) for r in records], self.palette,
                                     normalize=o["normalize"], offset=o["offset"])
             hidden = [r.record_id for r in records if r.record_id in o.get("hidden", [])]
-            chart.set_data(series, x_label=axis.label, reversed=axis.reversed, x_range=o.get("x_range"),
-                           hidden=hidden, y_label="Normalized intensity (a.u.)" if o["normalize"] else
-                           "Intensity (a.u.)")
+            chart.set_data(series, x_label=plain_label(axis.label), reversed=axis.reversed, x_range=o.get("x_range"),
+                           hidden=hidden, x_unit=records[0].spec.x_unit,  # 纵轴标题与出版图相同，归一化时也不变
+                           marks=self.chart_marks(records, [s.color for s in series]))
         else:
             r = records[0]
             d = self.display(r.record_id)
-            chart.set_data(single_series(r, d, self.palette), x_label=axis.label, reversed=axis.reversed,
-                           x_range=d.x_range, y_fixed=d.y_range if d.y_mode == "fixed" else None, hidden=d.hidden)
+            series = single_series(r, d, self.palette)
+            chart.set_data(series, x_label=plain_label(axis.label), reversed=axis.reversed,
+                           x_range=d.x_range, y_fixed=d.y_range if d.y_mode == "fixed" else None, hidden=d.hidden,
+                           x_unit=r.spec.x_unit, marks=self.chart_marks(records, [s.color for s in series]))
         self.chart = chart
         self.update_points(chart.lo, chart.hi, update=False)
         return chart.control
@@ -484,6 +523,95 @@ class MethodView(TabView):
         self.st["view"] = (e.control.selected or ["single"])[0]
         self.refresh_center()
         self.inspector.refresh()
+
+    # ============================================================
+    # 峰位表与参考物相：标在谱线图上（交互图和出版图相同）
+    # ============================================================
+    def marks_supported(self) -> bool:
+        return figures.supports_marks(self.view_mode, self.view_records())
+
+    def peak_marks(self) -> dict[str, float]:
+        name = self.st["peak_table"]
+        if not name or name not in self.project.peak_tables:
+            return {}
+        return self.project.peaks(name)
+
+    def shown_phases(self) -> list[str]:
+        if not self.PHASES:
+            return []
+        hidden = set(self.st["hidden_phases"])
+        return [ph for ph in self.project.phase_names() if ph not in hidden]
+
+    def curve_colors(self, records=None) -> list[str]:
+        """当前视图中各条谱的颜色（未拟合的谱线）：叠加、并排时按通用色卡依次取色。"""
+        records = self.view_records() if records is None else records
+        if self.view_mode in ("overlay", "side") and len(records) > 1:
+            return overlay_colors(overlay_labels(records), [self.display(r.record_id) for r in records], self.palette)
+        return [self.line_color(r) for r in records]
+
+    def phase_colors(self, avoid=()) -> dict[str, str]:
+        """各物相的颜色：指定的优先，其余按通用色卡取色，并避开谱线的颜色（与 GMA 出版图相同）。"""
+        phases = self.project.phase_names()
+        if not phases:
+            return {}
+        colors = assign_colors(phases, self.palette, {k: v for k, v in self.st["phase_colors"].items()
+                                                      if k in phases}, avoid=list(avoid))
+        return dict(zip(phases, colors, strict=True))
+
+    def chart_marks(self, records, curve_colors) -> list[Mark]:
+        if not figures.supports_marks(self.view_mode, records):
+            return []
+        marks = [Mark(position, label, PEAK_COLOR) for label, position in self.peak_marks().items()]
+        phases = self.shown_phases()
+        if phases:
+            colors = self.phase_colors(curve_colors)
+            for row in self.project.reference_phases:
+                if row["phase"] in phases:
+                    marks.append(Mark(float(row["two_theta"]), row["hkl"], colors[row["phase"]], dashed=True))
+        return marks
+
+    def set_peak_table(self, name: str | None) -> None:
+        self.st["peak_table"] = name or None
+        self.redraw_marks()
+
+    def set_phase_shown(self, phase: str, shown: bool) -> None:
+        hidden = self.st["hidden_phases"]
+        if shown and phase in hidden:
+            hidden.remove(phase)
+        elif not shown and phase not in hidden:
+            hidden.append(phase)
+        self.redraw_marks()
+
+    async def choose_phase_color(self, phase: str) -> None:
+        current = self.phase_colors(self.curve_colors()).get(phase, PEAK_COLOR)
+        color = await pick_color(self.app.page, self.p, f"{S.CHOOSE_COLOR} · {phase}", current)
+        if color is None or color == current:
+            return
+        # 其他物相的颜色一起记下，不随这个物相换色而变
+        self.st["phase_colors"] = {**self.phase_colors(self.curve_colors()), phase: color}
+        self.redraw_marks()
+
+    def redraw_marks(self) -> None:
+        """峰位表、参考物相变了：交互图只重画标注，不重新发送数据点。"""
+        if self.chart is not None and self.view_mode != "side":
+            self.chart.set_marks(self.chart_marks(self.view_records(), [s.color for s in self.chart.series]))
+        else:
+            self.refresh_center()
+        self.inspector.refresh()
+
+    async def edit_peak_tables(self) -> None:
+        """编辑峰位表；点“确定”后标出对话框中选中的表。"""
+        name = await PeakTablesDialog(self).show()
+        if name is None:
+            return
+        self.st["peak_table"] = name or None
+        self.session.changed("data", source=self)
+        self.redraw_marks()
+
+    async def edit_phases(self) -> None:
+        if await PhasesDialog(self).show():
+            self.session.changed("data", source=self)
+            self.redraw_marks()
 
     # ============================================================
     # 显示设置
@@ -723,11 +851,31 @@ class MethodView(TabView):
         if folder:
             await self.inspect_and_import(folder=folder)
 
-    async def inspect_and_import(self, *, paths=None, folder=None) -> None:
-        reader = self.app.settings.readers.get(self.spec.method) or self.READERS[0]
+    async def import_table(self) -> None:
+        """其他软件导出的表格：先选文件，再指定各列的含义（方案 8“通用 CSV 导入”）。"""
+        files = await self.app.file_picker.pick_files(
+            dialog_title=S.IMPORT_TABLE_TITLE, allow_multiple=True, file_type=ft.FilePickerFileType.CUSTOM,
+            allowed_extensions=[s.lstrip(".") for s in importing.TABLE_SUFFIXES])
+        paths = [f.path for f in files or [] if f.path]
+        if paths:
+            await self.import_table_files(paths)
+
+    async def import_table_files(self, paths: list[str]) -> None:
+        try:
+            table = await asyncio.to_thread(read_table, paths[0])
+        except Exception as exc:  # noqa: BLE001 - 读取出错的原因显示给用户
+            self.app.show_error(S.IMPORT_FAILED, S.FILE_ERROR.format(name=Path(paths[0]).name, error=exc))
+            return
+        columns = await ColumnsDialog(self, table, paths).show()
+        if columns is not None:
+            await self.inspect_and_import(paths=paths, reader=GENERIC_READER, columns=columns)
+
+    async def inspect_and_import(self, *, paths=None, folder=None, reader: str | None = None, columns=None) -> None:
+        reader = reader or self.app.settings.readers.get(self.spec.method) or self.READERS[0]
         self.workspace.set_status(S.IMPORTING.format(n=len(paths) if paths else "…"))
         try:
-            items = await asyncio.to_thread(importing.inspect, paths, folder, method=self.spec.method, reader=reader)
+            items = await asyncio.to_thread(importing.inspect, paths, folder, method=self.spec.method, reader=reader,
+                                            columns=columns)
         except ProjectError as exc:
             self.workspace.set_status(S.READY)
             self.app.show_error(S.IMPORT_FAILED, str(exc))
@@ -740,7 +888,8 @@ class MethodView(TabView):
         if not items:
             self.app.toast(S.IMPORT_NOTHING)
             return
-        added = await ImportDialog(self, items, folder=folder, readers=self.READERS).show()
+        readers = [GENERIC_READER] if reader == GENERIC_READER else self.READERS
+        added = await ImportDialog(self, items, folder=folder, readers=readers).show()
         if not added:
             return
         first = added[0]
@@ -830,8 +979,18 @@ class MethodView(TabView):
     def figure_request(self, options: FigureOptions):
         records = self.view_records()
         o = self.st["overlay"]
+        marks = {}
+        if figures.supports_marks(self.view_mode, records):
+            peaks = self.peak_marks()
+            if peaks:
+                marks["peaks"] = peaks
+            phases = self.shown_phases()
+            if phases:
+                colors = self.phase_colors(self.curve_colors(records))
+                marks["references"] = self.project.references(phases)
+                marks["phase_colors"] = {k: colors[k] for k in phases}
         return figures.make_request(self.view_mode, records, [self.display(r.record_id) for r in records], options,
-                                    self.palette, normalize=o["normalize"], offset=o["offset"])
+                                    self.palette, normalize=o["normalize"], offset=o["offset"], **marks)
 
     def describe(self) -> str:
         records = self.view_records()

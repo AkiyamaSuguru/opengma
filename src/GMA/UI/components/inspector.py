@@ -14,7 +14,7 @@ import flet as ft
 
 from .. import theme as th
 from ..services import analysis
-from ..services.text import local_time
+from ..services.text import local_time, unit
 from ..strings import S
 from . import widgets as w
 
@@ -168,7 +168,7 @@ class Inspector:
                 w.text(color.upper(), p, th.SIZE_SMALL)], spacing=8)]
 
         lo, hi = view.x_range_shown()
-        unit = record.spec.x_unit
+        x_unit = unit(record.spec.x_unit)
         self.lo_field = self.number(hi if record.spec.axis.reversed else lo, lambda v: view.set_x_bound(0, v))
         self.hi_field = self.number(lo if record.spec.axis.reversed else hi, lambda v: view.set_x_bound(1, v))
         y_fixed = display.y_mode == "fixed" and display.y_range
@@ -177,7 +177,7 @@ class Inspector:
             on_change=lambda e: view.set_y_mode((e.control.selected or ["auto"])[0]),
             segments=[ft.Segment(value="auto", label=S.Y_AUTO), ft.Segment(value="fixed", label=S.Y_FIXED)])
         parts += [self.section(S.AXES),
-                  ft.Row([w.text(S.X_RANGE_UNIT.format(unit=unit), p, th.SIZE_BODY, expand=True), self.lo_field,
+                  ft.Row([w.text(S.X_RANGE_UNIT.format(unit=x_unit), p, th.SIZE_BODY, expand=True), self.lo_field,
                           ft.Text("–", color=p.muted), self.hi_field], spacing=6,
                          vertical_alignment=ft.CrossAxisAlignment.CENTER),
                   ft.Row([w.text(S.Y_AXIS, p, th.SIZE_BODY, expand=True), y_mode],
@@ -187,6 +187,9 @@ class Inspector:
             parts.append(ft.Row([ft.Container(expand=True), self.number(ylo, lambda v: view.set_y_bound(0, v), 96),
                                  ft.Text("–", color=p.muted), self.number(yhi, lambda v: view.set_y_bound(1, v), 96)],
                                 spacing=6))
+
+        if view.marks_supported():
+            parts += self.marks_section()
 
         overlay = view.view_mode == "overlay"
         o = view.st["overlay"]
@@ -209,6 +212,44 @@ class Inspector:
                                        on_click=lambda e: view.apply_to_others(record), expand=True)
             footer = ft.Row([footer])
         return parts, footer
+
+    def marks_section(self) -> list[ft.Control]:
+        """峰位表（所有方法的谱线图）和参考物相（XRD）：选择要标出的，编辑的内容保存在项目中。"""
+        p, view = self.p, self.view
+        page = view.app.page
+        tables = list(view.project.peak_tables)
+        current = view.st["peak_table"] if view.st["peak_table"] in tables else ""
+        edit_peaks = ft.TextButton(S.EDIT, icon=ft.Icons.EDIT_NOTE_ROUNDED,
+                                   on_click=lambda e: page.run_task(view.edit_peak_tables))
+        parts: list[ft.Control] = [self.section(S.PEAK_TABLE, edit_peaks)]
+        if tables:
+            parts.append(ft.Dropdown(
+                value=current, dense=True, text_size=th.SIZE_BODY, expand=True,
+                options=[ft.DropdownOption(key="", text=S.NO_MARKS)] + [ft.DropdownOption(key=n, text=n) for n in tables],
+                on_select=lambda e: view.set_peak_table(e.control.value or None)))
+        else:
+            parts.append(w.faint(S.NO_PEAK_TABLES, p, th.SIZE_SMALL))
+        if view.PHASES:
+            edit_phases = ft.TextButton(S.EDIT, icon=ft.Icons.EDIT_NOTE_ROUNDED,
+                                        on_click=lambda e: page.run_task(view.edit_phases))
+            parts.append(self.section(S.REFERENCE_PHASES, edit_phases))
+            phases = view.project.phase_names()
+            if not phases:
+                parts.append(w.faint(S.NO_PHASES, p, th.SIZE_SMALL))
+            colors = view.phase_colors(view.curve_colors()) if phases else {}
+            shown = set(view.shown_phases())
+            counts = {ph: sum(1 for r in view.project.reference_phases if r["phase"] == ph) for ph in phases}
+            for phase in phases:
+                parts.append(ft.Row([
+                    ft.Checkbox(value=phase in shown, on_change=lambda e, ph=phase: view.set_phase_shown(
+                        ph, bool(e.control.value)), width=28, height=28),
+                    self.swatch(colors[phase], S.CHOOSE_COLOR, lambda e, ph=phase: page.run_task(
+                        view.choose_phase_color, ph), size=16),
+                    ft.Text(phase, size=th.SIZE_BODY, color=p.text, expand=True, max_lines=1,
+                            overflow=ft.TextOverflow.ELLIPSIS, tooltip=phase),
+                    w.faint(S.N_PLANES.format(n=counts[phase]), p, th.SIZE_SMALL),
+                ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+        return parts
 
     def _offset(self, e) -> None:
         try:
@@ -256,7 +297,7 @@ class Inspector:
         components = analysis.component_rows(m)
         if components:
             colors = view.component_colors(record)
-            unit = record.spec.x_unit
+            x_unit = unit(record.spec.x_unit)
             widths = (None, 60, 50, 54, 48)  # 分峰名占剩下的宽度
 
             def cells(values, *, head=False, color=None, bold_last=False):
@@ -272,7 +313,7 @@ class Inspector:
                 return ft.Container(content=ft.Row(out, spacing=4), padding=ft.Padding.symmetric(vertical=6),
                                     border=ft.Border.only(bottom=ft.BorderSide(1, p.border)))
 
-            table = [cells([S.COL_COMPONENT, S.COL_POSITION.format(unit=unit), S.COL_HEIGHT, S.COL_AREA,
+            table = [cells([S.COL_COMPONENT, S.COL_POSITION.format(unit=x_unit), S.COL_HEIGHT, S.COL_AREA,
                             S.COL_FRACTION], head=True)]
             table += [cells([c["name"], c["position"], c["height"], c["area"], c["fraction"]],
                             color=colors.get(c["name"]), bold_last=True) for c in components]
@@ -341,6 +382,19 @@ class Inspector:
         metadata = record.metadata
         if metadata:
             parts.append(self.section(S.INFO_METADATA))
-            for key, value in list(metadata.items())[:80]:
-                parts.append(self.kv(str(key), str(value), selectable=True))
+            parts += self.metadata_rows(metadata)
         return parts
+
+    def metadata_rows(self, metadata: dict, limit: int = 120) -> list[ft.Control]:
+        """仪器元数据：Raman 是“键 = 值”，XRD 按 [节] 分组（每节一个小标题）。"""
+        p, rows = self.p, []
+        for key, value in metadata.items():
+            if len(rows) >= limit:
+                break
+            if isinstance(value, dict):
+                rows.append(ft.Text(str(key), size=th.SIZE_SMALL, weight=ft.FontWeight.W_600, color=p.text))
+                rows += [ft.Container(content=self.kv(str(k), str(v), selectable=True), padding=ft.Padding.only(left=10))
+                         for k, v in list(value.items())[:limit]]
+            else:
+                rows.append(self.kv(str(key), str(value), selectable=True))
+        return rows

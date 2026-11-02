@@ -50,11 +50,11 @@ class ModuleSpec:
 
 MODULES: tuple[ModuleSpec, ...] = (
     ModuleSpec("xps", "XPS", "xps", "#2563EB", "#60A5FA", "#E5EEFE", "#1B2A44", METHOD, AVAILABLE,
-               "Avantage 导出数据\n全谱 · 元素谱", method="XPS", formats="Avantage 导出的 .xlsx / .xls"),
+               "Avantage 导出数据\n全谱 · 元素谱", method="XPS", formats="Avantage 导出的 .xlsx / .xls，其他软件导出的表格"),
     ModuleSpec("raman", "Raman", "raman", "#7C3AED", "#A78BFA", "#F0E9FE", "#2A2142", METHOD, AVAILABLE,
-               "Horiba LabSpec\n谱线 · 拟合谱", method="Raman", formats="LabSpec 导出的 .txt"),
+               "Horiba LabSpec\n谱线 · 拟合谱", method="Raman", formats="LabSpec 导出的 .txt，其他软件导出的表格"),
     ModuleSpec("xrd", "XRD", "xrd", "#D97706", "#FBBF24", "#FDF1DE", "#3A2D14", METHOD, AVAILABLE,
-               "Bruker D8 Advance\n图谱 · 参考物相", method="XRD", formats="D8 Advance 导出的 .txt"),
+               "Bruker D8 Advance\n图谱 · 参考物相", method="XRD", formats="D8 Advance 导出的 .txt，其他软件导出的表格"),
     ModuleSpec("srim", "SRIM · dpa", "calc", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, PLANNED,
                "离子辐照\n损伤计算"),
     ModuleSpec("salt", "熔盐配比", "calc", "#64748B", "#94A3B8", "#EDF0F4", "#252C35", TOOL, PLANNED,

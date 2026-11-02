@@ -49,7 +49,10 @@ class DataPanel:
             items=[ft.PopupMenuItem(content=S.IMPORT_FILES, icon=ft.Icons.DESCRIPTION_OUTLINED,
                                     on_click=lambda e: view.app.page.run_task(view.import_files)),
                    ft.PopupMenuItem(content=S.IMPORT_FOLDER, icon=ft.Icons.FOLDER_OPEN_OUTLINED,
-                                    on_click=lambda e: view.app.page.run_task(view.import_folder))])
+                                    on_click=lambda e: view.app.page.run_task(view.import_folder)),
+                   ft.PopupMenuItem(),
+                   ft.PopupMenuItem(content=S.IMPORT_TABLE, icon=ft.Icons.TABLE_VIEW_OUTLINED,
+                                    on_click=lambda e: view.app.page.run_task(view.import_table))])
         filters = ft.SegmentedButton(
             selected=[view.st["filter"]], show_selected_icon=False, on_change=self.on_filter,
             segments=[ft.Segment(value=k, label=t) for k, t in view.FILTERS],
@@ -141,13 +144,6 @@ class DataPanel:
         ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER), p, on_click=toggle, height=ROW_H,
             padding=ft.Padding.only(left=4, right=10))
 
-    def badge(self, record) -> str:
-        if record.kind == "survey":
-            return S.BADGE_SURVEY
-        if record.fitted:
-            return S.BADGE_FITTED.format(n=len(record.components))
-        return S.BADGE_RAW
-
     def record_row(self, record) -> ft.Control:
         p, view = self.p, self.view
         rid = record.record_id
@@ -170,7 +166,7 @@ class DataPanel:
                 ft.PopupMenuItem(content=S.REMOVE_SPECTRUM, icon=ft.Icons.DELETE_OUTLINE,
                                  on_click=lambda e: view.app.page.run_task(view.remove_records, [rid])),
             ])
-        badge = ft.Container(content=ft.Text(self.badge(record), size=10.5, color=p.muted, max_lines=1),
+        badge = ft.Container(content=ft.Text(view.badge(record), size=10.5, color=p.muted, max_lines=1),
                              bgcolor=p.subtle, border_radius=99, padding=ft.Padding.symmetric(horizontal=8, vertical=1))
         row = ft.Row([
             ft.Checkbox(value=rid in view.st["checked"], on_change=check, width=28, height=28),

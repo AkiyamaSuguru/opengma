@@ -69,18 +69,19 @@ class ImportDialog:
                     else S.IMPORT_FROM_FILES.format(n=len(self.items)))
         apply_all = ft.TextButton(S.APPLY_TO_ALL, on_click=self.apply_sample)
         reader = ft.Dropdown(value=self.reader, dense=True, text_size=th.SIZE_BODY, width=220, label=S.READER,
-                             options=[ft.DropdownOption(key=r, text=r) for r in self.readers],
-                             on_select=self.on_reader)
+                             options=[ft.DropdownOption(key=r, text=importing.reader_label(r)) for r in self.readers],
+                             on_select=self.on_reader, disabled=len(self.readers) < 2)
         mode = ft.SegmentedButton(
             selected=[self.mode], show_selected_icon=False, on_change=self.on_mode,
             segments=[ft.Segment(value="absolute", label=S.COMPONENT_ABSOLUTE),
                       ft.Segment(value="relative", label=S.COMPONENT_RELATIVE_SHORT)])
+        has_fits = any(i.fitted for i in self.items)
         conflict = ft.Dropdown(value=self.conflict, dense=True, text_size=th.SIZE_BODY, width=150,
                                label=S.ON_CONFLICT, options=[ft.DropdownOption(key=k, text=t) for k, t in CONFLICTS],
                                on_select=self.on_conflict)
-        settings_row = ft.Row([reader, ft.Row([self.sample, apply_all], spacing=4, tight=True),
-                               ft.Column([w.faint(S.COMPONENT_MODE_TITLE, p, th.SIZE_TINY), mode], spacing=2,
-                                         tight=True),
+        mode_box = ft.Column([w.faint(S.COMPONENT_MODE_TITLE, p, th.SIZE_TINY), mode], spacing=2, tight=True,
+                             visible=has_fits)   # 没有拟合谱时不需要分峰数据模式
+        settings_row = ft.Row([reader, ft.Row([self.sample, apply_all], spacing=4, tight=True), mode_box,
                                ft.Container(expand=True), conflict], spacing=16,
                               vertical_alignment=ft.CrossAxisAlignment.END)
         header = self.table_row([ft.Container(), *(w.label(t, p) for t in (S.COL_FILE, S.COL_KIND, S.COL_NAME,

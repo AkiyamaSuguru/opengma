@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.metadata as md
 import platform
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -64,3 +65,22 @@ def environment() -> str:
         except md.PackageNotFoundError:
             continue
     return "\n".join(lines)
+
+
+# 上标负号 ⁻ 不在附带的界面字体中，cm-1 保持原样，避免有的系统上显示成方框
+UNITS = {"deg": "°"}
+
+
+def unit(value: str) -> str:
+    """横轴单位的显示写法：deg → °，其余不变。"""
+    return UNITS.get(value, value)
+
+
+def plain_label(label: str) -> str:
+    """
+    坐标轴标题的纯文字写法：GMA 给出版图用的标题含 matplotlib 的公式写法（如 cm$^{-1}$、2$\\theta$），
+    交互图中写成 cm-1、2θ。
+    """
+    text = label.replace(r"$\theta$", "θ")
+    text = re.sub(r"\$\^\{([^}]*)\}\$", r"\1", text)
+    return text.replace("$", "")

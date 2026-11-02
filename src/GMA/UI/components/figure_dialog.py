@@ -180,7 +180,7 @@ class FigureDialog:
             row(S.HIDE_Y_TICKS, ft.Switch(value=o.hide_y_ticks,
                                           on_change=lambda e: self.change(hide_y_ticks=e.control.value))),
         ]
-        if any(r.fitted for r in req.records) and req.function == "plot_element_static":
+        if any(r.fitted for r in req.records) and req.function in figures.FIT_FUNCTIONS.values():
             controls.append(row(S.FILL_ALPHA, number(o.component_alpha,
                                                      lambda v: self.change(component_alpha=min(max(v, 0), 1)), 80)))
         if self.view.view_mode == "overlay" and len(req.records) > 1:

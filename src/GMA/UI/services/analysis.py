@@ -16,6 +16,7 @@ from ...CM.common.metrics import SpectrumMetrics, spectrum_metrics
 from ...CM.XPS import XPSAnalyzer
 from ...project import Record
 from ..strings import S
+from .text import unit
 
 
 def metrics_for(record: Record) -> SpectrumMetrics:
@@ -42,12 +43,12 @@ def quality_rows(m: SpectrumMetrics) -> list[tuple[str, str]]:
 
 
 def spectrum_rows(m: SpectrumMetrics, record: Record) -> list[tuple[str, str]]:
-    unit = record.spec.x_unit
+    x_unit = unit(record.spec.x_unit)
     return [
         (S.X_RANGE_OF.format(axis=S.AXIS_NAMES.get(record.method, S.X_AXIS)),
-         f"{fmt(m.x_min)} – {fmt(m.x_max)} {unit}"),
+         f"{fmt(m.x_min)} – {fmt(m.x_max)} {x_unit}"),
         (S.POINT_COUNT, f"{m.point_count:,}".replace(",", " ")),
-        (S.MAX_POSITION, f"{fmt(m.max_intensity_position)} {unit}"),
+        (S.MAX_POSITION, f"{fmt(m.max_intensity_position)} {x_unit}"),
     ]
 
 
