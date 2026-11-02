@@ -185,12 +185,28 @@ def executable(target: str) -> Path:
     sys.exit(f"No program found in {out}; build it first.")
 
 
+def clean_environment() -> dict[str, str]:
+    """
+    运行打包好的程序时去掉开发环境的痕迹（uv run 设置的虚拟环境、PYTHONPATH 等），
+    这样自检用的只能是程序自带的 Python 和依赖。
+    """
+    env = dict(os.environ)
+    venv = env.pop("VIRTUAL_ENV", None)
+    for name in ("PYTHONHOME", "PYTHONPATH", "CONDA_PREFIX", "UV_PROJECT_ENVIRONMENT"):
+        env.pop(name, None)
+    if venv:
+        env["PATH"] = os.pathsep.join(p for p in env.get("PATH", "").split(os.pathsep)
+                                      if not p.startswith(venv))
+    return env
+
+
 def smoke(args) -> None:
     check_host(args.target)
     program = executable(args.target)
     folder = Path(tempfile.mkdtemp(prefix="opengma-smoke-"))
     result_path = folder / "result.json"
-    env = {**os.environ, "OPENGMA_SMOKE_TEST": str(result_path), "OPENGMA_HOME": str(folder / "home")}
+    env = clean_environment()
+    env.update({"OPENGMA_SMOKE_TEST": str(result_path), "OPENGMA_HOME": str(folder / "home")})
     print(f"+ {program}", flush=True)
     try:
         run = subprocess.run([str(program)], env=env, capture_output=True, text=True, encoding="utf-8",
@@ -215,8 +231,8 @@ def smoke(args) -> None:
         sys.exit("Self-check failed.")
     print("Smoke test passed: the packaged app runs with its own Python.", flush=True)
     annotate(f"Smoke test of the {args.target} app passed",
-             [f"{key}: {result.get(key)}" for key in ("python", "executable", "prefix", "platform", "embedded",
-                                                       "window")], level="notice")
+             [f"{key}: {result.get(key)}" for key in ("python", "executable", "prefix", "numpy", "platform",
+                                                       "embedded", "window")], level="notice")
 
 
 def main() -> None:

@@ -56,6 +56,7 @@ def run_checks() -> dict:
         "prefix": sys.prefix,
         "platform": platform.platform(),
         "embedded": os.environ.get("FLET_PLATFORM"),
+        "numpy": _location("numpy"),   # 依赖从哪里导入：打包的程序中应在程序自己的文件夹里
         "checks": {},
     }
     with tempfile.TemporaryDirectory(prefix="opengma-smoke-") as folder:
@@ -70,6 +71,13 @@ def run_checks() -> dict:
                 result.setdefault("tracebacks", {})[name] = traceback.format_exc()
     result["ok"] = all(v == "ok" for v in result["checks"].values())
     return result
+
+
+def _location(module: str) -> str:
+    try:
+        return str(Path(__import__(module).__file__).parent)
+    except Exception as exc:  # noqa: BLE001
+        return f"{type(exc).__name__}: {exc}"
 
 
 def write_result(path: Path, result: dict) -> None:
