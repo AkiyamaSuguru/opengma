@@ -10,10 +10,10 @@ OPEN GMA（Open General Material Analyzer）是 Jay 开发的材料表征数据�
 | --- | --- | --- |
 | 数据读取 | 读取不同仪器导出的数据，统一转换为标准数据结构 | XPS、Raman、XRD 已完成 |
 | 绘图 | 学术出版图（matplotlib）和交互图（plotly） | XPS、Raman、XRD 已完成 |
-| 数据分析 | 常用表征方法的数据分析，如分峰拟合 | 规划中 |
+| 数据分析 | 常用表征方法的数据分析，基于已经拟合好的结果 | XPS 拟合质量与分峰指标已完成 |
 | 计算 | 通用以及专用的物理量计算 | 规划中 |
-| 结构化存储 | 用数据库等形式结构化存储数据，方便复用 | 规划中 |
-| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | 规划中 |
+| 结构化存储 | 把多个样品、多种表征方法的数据整理成一个项目文件（NetCDF），可导出 CSV / Excel | 已完成 |
+| UI | 基于 Flet 的图形界面，方便不熟悉 Python 的使用者 | 开发中 |
 
 ## 设计哲学
 
@@ -33,11 +33,14 @@ src/GMA/
 │   ├── XPS/
 │   │   ├── schema.py        # 标准数据结构（列名）
 │   │   ├── loader.py        # 读取入口 XPSLoader
+│   │   ├── analyzer.py      # 分析入口 XPSAnalyzer
 │   │   ├── plotter.py       # 绘图入口 XPSPlotter
 │   │   ├── XLoader/         # 各仪器 / 软件的 reader
+│   │   ├── XAnalyzer/       # 分析的实现（拟合质量、分峰指标）
 │   │   └── XPlotter/        # 各种图的实现，以及 XPS 定制色表
 │   ├── Raman/               # 结构同上：RamanLoader、RamanPlotter、RLoader/、RPlotter/
 │   └── XRD/                 # 结构同上：XRDLoader、XRDPlotter、DLoader/、DPlotter/
+├── project/                 # 结构化存储：项目模型、NetCDF 项目文件、导入与清洗、导出
 └── utils/
 tests/                       # 测试
 ```
@@ -127,7 +130,7 @@ plotter.plot_pattern_interactive(patterns, references=references).show()
 
 ## 使用方法
 
-所有功能都从两类入口使用：**Loader** 把仪器导出的文件读成[标准数据结构](#标准数据结构)的 DataFrame，**Plotter** 把 DataFrame 画成图。两者只通过 DataFrame 衔接，所以 Plotter 也能画你自己整理的数据。六个入口都可以直接从 `GMA` 导入：`XPSLoader`、`XPSPlotter`、`RamanLoader`、`RamanPlotter`、`XRDLoader`、`XRDPlotter`。
+所有功能都从两类入口使用：**Loader** 把仪器导出的文件读成[标准数据结构](#标准数据结构)的 DataFrame，**Plotter** 把 DataFrame 画成图。两者只通过 DataFrame 衔接，所以 Plotter 也能画你自己整理的数据。这些入口都可以直接从 `GMA` 导入：`XPSLoader`、`XPSPlotter`、`RamanLoader`、`RamanPlotter`、`XRDLoader`、`XRDPlotter`，以及分析入口 `XPSAnalyzer`（见[分析](#分析)）。
 
 下面的例子沿用[快速上手](#快速上手)中读取的数据。
 
@@ -396,6 +399,57 @@ with plotter.style():
 
 需要与通用色卡一致的颜色时（如自己补画曲线），可以用 `GMA.CM.common.palette_colors(n, palette)` 从通用色卡取 n 个颜色。
 
+### 分析
+
+分析只处理 Avantage 等软件已经拟合好的结果，不做扣背景和峰拟合，只用标准数据结构中已有的列计算。目前提供 XPS 的数值指标：
+
+```python
+from GMA import XPSAnalyzer
+
+analyzer = XPSAnalyzer()
+m = analyzer.metrics(c1s)          # 分峰列已包含背景时用默认的 component_mode="absolute"
+print(m.r_squared, m.rmse)         # 拟合质量：比较 Intensity 与 Fitting Curve
+analyzer.component_table(m)        # 分峰、峰位、峰高、面积、面积占比（%）
+```
+
+| 指标 | 计算方法 |
+| --- | --- |
+| 拟合质量 | Intensity 与 Fitting Curve 的 RMSE、MAE、R² |
+| 峰位 | 分峰扣除背景后在数据点上取最大值的位置，精度等于数据的步长 |
+| 峰高 | 峰位处分峰曲线的强度（含背景，与图中一致） |
+| 面积 | 扣除背景后的强度（负值按 0 计）对横轴的梯形积分 |
+| 面积占比 | 各分峰面积之比，不是原子百分比 |
+
+未拟合的谱只有数据范围、点数和最大强度位置。计算在 `GMA.CM.common.metrics` 中实现，其他表征方法的拟合谱也可以用 `spectrum_metrics(df, AXIS)`。
+
+## 项目文件
+
+`GMA.project` 把多个样品、多种表征方法的数据整理成一个项目，保存为一个 NetCDF-4 文件（`.nc`）。文件内部是 xarray 的 DataTree，层级为 `/样品/方法/谱图`，不用 GMA 也能用 `xarray.open_datatree(path, engine="h5netcdf")` 直接打开。
+
+```python
+from GMA import XPSPlotter
+from GMA.project import Project, commit, export_excel, inspect_folder, load_project, save_project
+
+project = Project("SiC-FLiNaK 腐蚀")
+items = inspect_folder("data/B1_SiC_1100℃", "XPS")   # 文件夹名作样品名，文件名作谱图名
+for item in items:
+    print(item.name, item.kind, item.components, [n.text() for n in item.clean_notes], item.error)
+commit(project, items)                               # 读取成功的文件加入项目
+project.set_sample_info("B1_SiC_1100℃", "沉积温度", "1100 ℃")
+save_project(project, "SiC-FLiNaK 腐蚀.nc")
+
+project = load_project("SiC-FLiNaK 腐蚀.nc")
+c1s = project.get("B1_SiC_1100℃", "XPS", "C1s").to_dataframe()   # 标准数据结构的 DataFrame
+XPSPlotter().plot_element_static(c1s)
+export_excel(project.records.values(), "数据.xlsx", project=project)  # 每条谱图一个工作表，另附“信息”表
+```
+
+- **导入**：`inspect_folder`、`inspect_files`、`inspect_file` 读取文件但不改动项目，返回的导入项可以检查和修改（类型、样品名、谱图名、分峰名），确认后用 `commit` 加入项目。XPS 按文件名识别全谱（survey、wide、全谱等），其余为元素谱；读取仍然通过各表征方法的 Loader。
+- **清洗**：只做不改变科学含义的整理——数值转换、去除空值或非数值的行、忽略没有数值的分峰列、横轴排序，每一步记入清洗记录（`clean_notes`），重复的横轴值只提示不删除。
+- **来源**：每条谱图记录来源文件、SHA-256、读取器、导入时间和 GMA 版本，以及仪器元数据。
+- **导出**：`export_csv` 每条谱图一个 CSV，按 `样品/方法` 分文件夹；`export_excel` 每条谱图一个工作表。导出的列名就是标准数据结构的列名。
+- 项目中还可以保存样品信息、用户自己填写的峰位表（`peak_tables`）和 XRD 参考物相表（`reference_phases`），GMA 不内置任何峰位或物相。
+
 ## 标准数据结构
 
 各模块之间传递的数据都是 pandas DataFrame，列名定义在各表征方法的 `schema.py` 中：
@@ -412,10 +466,12 @@ with plotter.style():
 
 ## 开发进度
 
-- **XPS**：读取（Thermo Fisher Avantage 导出的 Excel，测试仪器 ESCALAB Xi+）和绘图已完成。
+- **XPS**：读取（Thermo Fisher Avantage 导出的 Excel，测试仪器 ESCALAB Xi+）、分析（拟合质量与分峰指标）和绘图已完成。
 - **Raman**：读取（Horiba LabRAM HR Evolution 导出的 txt）和绘图已完成。
 - **XRD**：读取（Bruker D8 Advance 导出的 txt）和绘图已完成。
-- **数据分析、计算、结构化存储、UI**：规划中。
+- **结构化存储**：项目文件（NetCDF）、导入与清洗记录、CSV / Excel 导出已完成。
+- **UI**：开发中。
+- **其他表征方法的分析、计算**：规划中。
 
 ## License
 

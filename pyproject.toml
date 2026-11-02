@@ -8,12 +8,15 @@ license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
     "flet>=1.0.5",
+    "h5netcdf[h5py]>=1.8.2",
     "marimo>=0.23.16",
     "matplotlib>=3.11.2",
+    "numpy>=2.3",
     "openpyxl>=3.1.5",
     "pandas>=3.1.0",
     "plotly>=7.1.0",
     "python-calamine>=0.9.0",
+    "xarray>=2026.9.0",
 ]
 
 # 让 uv sync 把 src/GMA 以可编辑模式装进环境，这样在任何位置都能 import GMA
